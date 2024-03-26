@@ -1,0 +1,10 @@
+<% include ./partials/header.ejs %>
+<div class="h-screen w-full flex bg-white dark:bg-zinc-900 text-zinc-950 dark:text-black justify-between items-center px-4">
+    <h1>hii</h1>
+    <form action="/createcomment" method="post">
+        <input type="text" placeholder="comment" name="comment">
+        <input type="button" value="submit">
+    </form>
+</div>
+
+<% include ./partials/footer.ejs %>
