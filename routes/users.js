@@ -1,7 +1,8 @@
+require('dotenv').config();
 const mongoose = require('mongoose')
 const plm = require("passport-local-mongoose")
 
-mongoose.connect("mongodb+srv://yash123:yash12@cluster0.qdqpirv.mongodb.net/instaclone?retryWrites=true&w=majority&appName=Cluster0")
+mongoose.connect(process.env.MONGO_URL).then(() => console.log('Connected!'));
 
 const userSchema = mongoose.Schema({
   username:String,

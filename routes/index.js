@@ -10,6 +10,10 @@ const upload = require("./multer")
 const fs = require('fs').promises;
 const path = require('path');
 const utils = require("../utils/utils");
+const cloudinary = require('../utils/cloudnary');
+const sharp = require('sharp');
+
+
 
 
 passport.use(new localStrategy(userModel.authenticate()))
@@ -163,9 +167,9 @@ router.get('/logout', function(req, res, next){
 
 router.post("/update",upload.single('image'), async function(req,res,next){
   const user = await userModel.findOneAndUpdate({username: req.session.passport.user},{username: req.body.username,name: req.body.name,bio: req.body.bio},{new: true})
-  
+  const result = await cloudinary.uploader.upload(req.file.path);
   if(req.file){
-    user.profileImage = req.file.filename
+    user.profileImage = result.secure_url
   }
   await user.save();
 
@@ -176,18 +180,23 @@ router.post("/update",upload.single('image'), async function(req,res,next){
 
 })
 
+
+
 router.post("/upload",isloggedin,upload.single("image"), async function(req,res){
   const user = await userModel.findOne({username: req.session.passport.user})
+  const result = await cloudinary.uploader.upload(req.file.path);
   const post = await postModel.create({
-    picture: req.file.filename,
+    picture: result.secure_url,
     user: user._id,
     caption: req.body.caption,
 
   })
+  console.log(post)
   user.posts.push(post._id)
   await user.save();
   res.redirect("/feed")
 })
+
 router.post("/story",isloggedin,upload.single("image"), async function(req,res){
   const user = await userModel.findOne({username: req.session.passport.user})
   const story = await storyModel.create({

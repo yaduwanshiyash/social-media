@@ -13,7 +13,7 @@
           <div
             class="gradient w-[18vw] h-[18vw] bg-sky-100 rounded-full bg-gradient-to-r from-purple-700 to-orange-500 flex items-center justify-center">
             <div class="inner w-[92%] h-[92%] rounded-full overflow-hidden">
-              <img class="w-full h-full object-cover" src="/images/uploads/<%= user.profileImage %>" alt="">
+              <img class="w-full h-full object-cover" src="<%= user.profileImage %>" alt="">
             </div>
           </div>
         </div>
@@ -25,7 +25,7 @@
             <div
               class="gradient w-[18vw] h-[18vw] bg-sky-100 rounded-full bg-gradient-to-r from-purple-700 to-orange-500 flex items-center justify-center">
               <div class="inner w-[92%] h-[92%] rounded-full overflow-hidden">
-                <img class="w-full h-full object-cover" src="/images/uploads/<%= elem.user.profileImage %>" alt="">
+                <img class="w-full h-full object-cover" src="<%= elem.user.profileImage %>" alt="">
               </div>
             </div>
           </div>
@@ -37,13 +37,13 @@
         <div class="post mt-10  w-full min-h-[50vh]">
           <div class="title px-4 flex items-center gap-2">
             <div class="w-[8vw] h-[8vw] bg-sky-100 rounded-full overflow-hidden">
-              <img class=" w-full h-full object-cover" src="/images/uploads/<%= elem.user.profileImage %>" alt="">
+              <img class=" w-full h-full object-cover" src="<%= elem.user.profileImage %>" alt="">
             </div>
             <a href="/userprofile/<%= elem.user.username %>"><h4 class="text-sm"><%= elem.user.username %></h4></a>
             <h6 class="text-xs opacity-30"><%= elem.date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) %></h6>
           </div>
           <div class="w-full h-full mt-4 bg-sky-100">
-            <img src="/images/uploads/<%= elem.picture%>" alt="">
+            <img src="<%= elem.picture%>" alt="">
           </div>
           <div class="options w-full px-4 flex justify-between items-center text-[1.4rem]">
             <div class="flex gap-3 mt-2">
