@@ -12,7 +12,7 @@ const path = require('path');
 const utils = require("../utils/utils");
 const cloudinary = require('../utils/cloudnary');
 const sharp = require('sharp');
-
+const gm = require('gm').subClass({ imageMagick: true });
 
 
 
@@ -88,24 +88,54 @@ router.get('/userprofile/:username', isloggedin, async function(req, res) {
 
 router.get('/comment/:id', isloggedin, async function(req, res) {
   const user = await userModel.findOne({username: req.session.passport.user})
-  const comments = await postModel.findOne({_id: req.params.id}).populate('comments')
-   console.log(comments)
+  const post = await postModel.findOne({ _id: req.params.id }).populate({
+    path: 'comments',
+    populate: { path: 'user' } // Populate the 'user' field of each comment
+  });
 
-  res.render('comment', {footer: true, user});
+  res.render('comment', {footer: true, user,post});
 });
 
-router.post('/createcomment', isloggedin, async function(req, res) {
-  const user = await userModel.findOne({username: req.session.passport.user}).populate("posts")
-  const post = await postModel.findOne({_id: req.params.id})
-  const comment = await commentModel.create({
-    comment: req.body.comment,
-    user: user._id,
-  })
-  post.comments.push(comment._id)
-  await post.save();
+router.post('/createcomment/:id', isloggedin, async function(req, res) {
+  try {
+    const user = await userModel.findOne({ username: req.session.passport.user }).populate("posts");
+    const post = await postModel.findOne({ _id: req.params.id });
 
-  res.render('comment', {footer: true, user,comment});
+
+    const comment = await commentModel.create({
+      comment: req.body.comment,
+      user: user._id,
+      whichpost: req.params.id,
+    });
+
+
+    post.comments.push(comment._id);
+    await post.save();
+
+    res.redirect('back');
+  } catch (error) {
+    // Handle any errors
+    console.error(error);
+    res.status(500).send("Internal Server Error");
+  }
 });
+
+
+// router.post('/createcomment', isloggedin, async function(req, res) {
+//   const user = await userModel.findOne({username: req.session.passport.user}).populate("posts")
+//   const post = await postModel.findOne({_id: req.params.id})
+//   console.log(post)
+//   const comment = await commentModel.create({
+//     comment: req.body.comment,
+//     user: user._id,
+//     whichpost:params.id,
+//   })
+//   console.log(comment)
+//   post.comments.push(comment._id)
+//   await post.save();
+
+//   res.render('back', {footer: true});
+// });
 
 router.get('/profile', isloggedin, async function(req, res) {
   const user = await userModel.findOne({username: req.session.passport.user}).populate("posts")
@@ -181,7 +211,6 @@ router.post("/update",upload.single('image'), async function(req,res,next){
 })
 
 
-
 router.post("/upload",isloggedin,upload.single("image"), async function(req,res){
   const user = await userModel.findOne({username: req.session.passport.user})
   const result = await cloudinary.uploader.upload(req.file.path);
@@ -234,6 +263,20 @@ router.get("/like/post/:id", isloggedin, async function(req,res){
   }
 
   await post.save();
+  res.redirect('back')
+})
+router.get("/like/comment/:id", isloggedin, async function(req,res){
+  const user = await userModel.findOne({ username: req.session.passport.user})
+  const comment = await commentModel.findOne({_id: req.params.id})
+
+  if(comment.likes.indexOf(user._id) == -1){
+    comment.likes.push(user._id)
+  }
+  else{
+    comment.likes.splice(comment.likes.indexOf(user._id), 1)
+  }
+
+  await comment.save();
   res.redirect('back')
 })
 

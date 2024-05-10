@@ -1,10 +1,56 @@
 <% include ./partials/header.ejs %>
-<div class="h-screen w-full flex bg-white dark:bg-zinc-900 text-zinc-950 dark:text-black justify-between items-center px-4">
-    <h1>hii</h1>
-    <form action="/createcomment" method="post">
-        <input type="text" placeholder="comment" name="comment">
-        <input type="button" value="submit">
-    </form>
+<div class="bg-zinc-900 min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <a class="text-sm text-blue-500" href="/feed"><i class="ri-arrow-left-s-line"></i> Back</a>
+        <!-- Post Content -->
+        <div class="bg-zinc-700 rounded-md shadow-md p-6 mb-8">
+            <!-- Post Header -->
+            <div class="flex items-center mb-4">
+                <div class="w-12 h-12 rounded-full overflow-hidden mr-4">
+                    <!-- <img src="/images/uploads/<%= post.user.profileImage %>" alt="User Profile Image" class="object-cover w-full h-full"> -->
+                </div>
+                <div>
+                    <h2 class="text-lg font-semibold"><%= post.user.username %></h2>
+                    <!-- <p class="text-sm text-gray-600">@<%= post.user.username %></p> -->
+                </div>
+            </div>
+            <!-- Post Image -->
+            <img src="<%= post.picture %>" alt="Post Image" class="w-full rounded-md mb-4">
+            <!-- Post Caption -->
+            <p class="text-gray-100 mb-4"><%= post.caption %></p>
+        </div>
+        
+        <!-- Comments Section -->
+        <div class="bg-zinc-700 rounded-md shadow-md p-6">
+            <!-- Comment Form -->
+            <form action="/createcomment/<%= post._id %>" method="post" class="mb-6">
+                <input type="text" name="comment" placeholder="Add a comment..." class="w-full border border-gray-300 rounded-md px-4 py-2 focus:outline-none mb-5 focus:border-blue-500">
+                <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded-md ml-2 focus:outline-none focus:bg-blue-600">comment</button>
+            </form>
+            <!-- Comments List -->
+            <div class="space-y-4 ">
+                <% post.comments.forEach(function(comment) { %>
+                    <div class="flex gap-2 justify-between  items-center  hover:bg-zinc-600 rounded-xl p-3">
+                     <div class="flex gap-2  items-center">
+                        <div class="w-9 h-9 rounded-full overflow-hidden mr-2">
+                            <img src="<%= comment.user.profileImage %>" alt="Post Image" class="w-full rounded-full h-full ">
+                        </div>
+                        <div>
+                            <a href="/userprofile/<%= comment.user.username %>"><p class="text-lg outline-none font-semibold text-white"><%= comment.user.username %></p></a>
+                            <p class="text-xl text-gray-100"><%= comment.comment %></p> <!-- Assuming the comment attribute is "comment" -->
+                        </div>
+                     </div>
+                        <a href="/like/comment/<%= comment._id %>">
+                            <% if(comment.likes.indexOf(user._id) !== -1){ %>
+                              <i class="ri-heart-3-fill text-red-600"></i>
+                            <% }else{ %>
+                              <i class="ri-heart-3-line"></i>
+                            <% } %>
+                          </a>
+                    </div>
+                <% }) %>
+            </div>
+        </div>
+    </div>
 </div>
-
 <% include ./partials/footer.ejs %>
