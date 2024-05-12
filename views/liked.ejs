@@ -1,5 +1,6 @@
 <% include ./partials/header.ejs %>
-<div class="nav flex bg-white dark:bg-zinc-900 text-zinc-950 dark:text-white justify-between items-center px-4">
+<div class="md:w-[40vw] md:mx-auto">
+<div class="nav flex bg-white dark:bg-zinc-900  text-zinc-950 dark:text-white justify-between items-center px-4">
     <a class="text-sm text-blue-500" href="/profile"><i class="ri-arrow-left-s-line"></i> Back</a>
     <h4><%= user.username %>'s likes</h4>
     <div class="icons flex gap-5">
@@ -11,7 +12,7 @@
     <% liked.likes.forEach(function(elem){ %>
         <a href="/userprofile/<%= elem.username %>" class="outline-none">
             <div class=" bg-zinc-800 dark:bg-zinc-980 text-white dark:text-white rounded-md px-3 py-3 flex items-center gap-5 mt-5">
-                <div class="image w-[11vw] h-[11vw] rounded-full overflow-hidden">
+                <div class="image w-[11vw] h-[11vw] md:w-[4vw] md:h-[4vw] rounded-full overflow-hidden">
                     <img src="<%= elem.profileImage %>" alt="">
                 </div>
                 <div class="text">
@@ -22,6 +23,7 @@
             </div>            
         </a>
     <% }) %>
+</div>
 </div>
 
 <% include ./partials/footer.ejs %>
