@@ -26,48 +26,142 @@ router.get('/login', function(req, res) {
   res.render('login', {footer: false});
 });
 
-router.get('/feed', isloggedin , async function(req, res) {
-  const user = await userModel.findOne({username: req.session.passport.user})
-  const post = await postModel.find().populate("user")
-  const story = await storyModel.find().populate("user")
+// router.get('/feed', isloggedin , async function(req, res) {
+//   const user = await userModel.findOne({username: req.session.passport.user})
+//   const post = await postModel.find().populate("user")
+//   const story = await storyModel.find().populate("user")
 
-  var obj = {};
-  const packs = story.filter(function(story){
-    if(!obj[story.user._id]){
-      obj[story.user._id] = "ascbvjanscm";
-      return true;
+//   var obj = {};
+//   const packs = story.filter(function(story){
+//     if(!obj[story.user._id]){
+//       obj[story.user._id] = "ascbvjanscm";
+//       return true;
+//     }
+//   })
+//   res.render('feed', {footer: true, post,user,story,stories: packs, dater: utils.formatRelativeTime});
+// });
+
+
+router.get("/feed", isloggedin, async function(req, res) {
+  try {
+    const user = await userModel.findOne({ username: req.session.passport.user });
+
+    if (!user) {
+      return res.status(404).send("User not found");
     }
-  })
-  res.render('feed', {footer: true, post,user,story,stories: packs, dater: utils.formatRelativeTime});
+
+    const posts = await postModel.find().populate('user');
+
+    const stories = await storyModel.find({ user: { $ne: user._id } }).populate('user');
+
+    const uniqueStories = {};
+    const filteredStories = stories.filter(story => {
+      if (!uniqueStories[story.user._id]) {
+        uniqueStories[story.user._id] = true;
+        return true;
+      }
+      return false;
+    });
+
+    res.render("feed", { footer: true, posts, user, stories: filteredStories });
+  } catch (error) {
+    console.error("Error occurred while fetching feed:", error);
+    res.status(500).send("Internal Server Error");
+  }
 });
+
+// router.get("/feed", isloggedin, async function (req, res) {
+//   const user = await userModel.findOne({ username: req.session.passport.user });
+//   const posts = await postModel
+//   .find()
+//   .populate('user')
+
+//   const stories = await storyModel.find({user: {$ne: user._id}})
+//   .populate('user');
+
+//   var obj = {};
+//   const packs = stories.filter(function(story){
+//     if(!obj[story.user._id]){
+//       obj[story.user._id] = "ascbvjanscm";
+//       return true;
+//     }
+//   })
+
+//   res.render("feed", { footer: true, posts, user, stories: packs });
+// });
+
+
 router.get("/story/:number", isloggedin, async function (req, res) {
-  const storyuser = await userModel.findOne({ username: req.session.passport.user })
-  .populate("stories")
+  try {
+    const storyuser = await userModel.findOne({ username: req.session.passport.user }).populate("story");
 
-  const image = storyuser.stories[req.params.number];
+    if (!storyuser || !storyuser.story || storyuser.story.length === 0) {
+      return res.redirect("/feed")
+    }
 
-  if(storyuser.stories.length > req.params.number){
-    res.render("story", { footer: false, storyuser: storyuser, storyimage : image, number: req.params.number });
-  }
-  else{
-    res.redirect("/feed");
+    const storyNumber = parseInt(req.params.number);
+    if (isNaN(storyNumber) || storyNumber < 0 || storyNumber >= storyuser.story.length) {
+      return res.redirect("/feed"); 
+    }
+
+    const image = storyuser.story[storyNumber];
+    res.render("story", { footer: false, storyuser, storyimage: image, number: storyNumber });
+  } catch (error) {
+    console.error("Error occurred while fetching story:", error);
+    res.status(500).send("Internal Server Error");
   }
 });
+
+// router.get("/story/:number", isloggedin, async function (req, res) {
+//   const storyuser = await userModel.findOne({ username: req.session.passport.user })
+//   .populate("story")
+
+//   const image = storyuser.story[req.params.number];
+
+//   if(storyuser.story.length > req.params.number){
+//     res.render("story", { footer: false, storyuser: storyuser, storyimage : image, number: req.params.number });
+//   }
+//   else{
+//     res.redirect("/feed");
+//   }
+// });
 
 router.get("/story/:id/:number", isloggedin, async function (req, res) {
-  const storyuser = await userModel.findOne({ _id: req.params.id })
-  .populate("stories")
+  try {
+    const storyuser = await userModel.findOne({ _id: req.params.id }).populate("story");
 
-  const image = storyuser.stories[req.params.number];
+    if (!storyuser || !storyuser.story || storyuser.story.length === 0) {
+      return res.redirect("/feed"); 
+    }
 
-  if(storyuser.stories.length > req.params.number){
-    res.render("story", { footer: false, storyuser: storyuser, storyimage : image, number: req.params.number });
+    const storyNumber = parseInt(req.params.number);
+    if (isNaN(storyNumber) || storyNumber < 0 || storyNumber >= storyuser.story.length) {
+      return res.redirect("/feed"); 
+    }
+
+    const image = storyuser.story[storyNumber];
+    res.render("story", { footer: false, storyuser, storyimage: image, number: storyNumber });
+  } catch (error) {
+    console.error("Error occurred while fetching story:", error);
+    res.status(500).send("Internal Server Error");
   }
-  else{
-    res.redirect("/feed");
-  }
-
 });
+
+
+// router.get("/story/:id/:number", isloggedin, async function (req, res) {
+//   const storyuser = await userModel.findOne({ _id: req.params.id })
+//   .populate("story")
+
+//   const image = storyuser.story[req.params.number];
+
+//   if(storyuser.story.length > req.params.number){
+//     res.render("story", { footer: false, storyuser: storyuser, storyimage : image, number: req.params.number });
+//   }
+//   else{
+//     res.redirect("/feed");
+//   }
+
+// });
 
 
 // router.get('/story/view/:id', isloggedin, async function(req, res) {
@@ -216,32 +310,77 @@ router.post("/update",upload.single('image'), async function(req,res,next){
 })
 
 
-router.post("/upload",isloggedin,upload.single("image"), async function(req,res){
-  const user = await userModel.findOne({username: req.session.passport.user})
-  const result = await cloudinary.uploader.upload(req.file.path);
-  const post = await postModel.create({
-    picture: result.secure_url,
-    user: user._id,
-    caption: req.body.caption,
 
-  })
-  console.log(post)
-  user.posts.push(post._id)
-  await user.save();
-  res.redirect("/feed")
-})
+router.post("/upload", isloggedin, upload.single("image"), async function(req, res) {
+  try {
+    const user = await userModel.findOne({ username: req.session.passport.user });
 
-router.post("/story",isloggedin,upload.single("image"), async function(req,res){
-  const user = await userModel.findOne({username: req.session.passport.user})
-  const story = await storyModel.create({
-    picture: req.file.filename,
-    user: user._id,
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
 
-  })
-  user.story.push(story._id)
-  await user.save();
-  res.redirect("/feed")
-})
+    if (!req.file) {
+      return res.status(400).json({ error: "No image uploaded" });
+    }
+
+    if (!["post", "story"].includes(req.body.type)) {
+      return res.status(400).json({ error: "Invalid type" });
+    }
+
+    const result = await cloudinary.uploader.upload(req.file.path);
+
+    if (req.body.type === "post") {
+      const post = await postModel.create({
+        picture: result.secure_url,
+        user: user._id,
+        caption: req.body.caption
+      });
+      console.log("New post created:", post);
+      user.posts.push(post._id);
+    } else if (req.body.type === "story") {
+      const story = await storyModel.create({
+        picture: result.secure_url,
+        user: user._id
+      });
+      console.log("New story created:", story);
+      user.story.push(story._id);
+    }
+
+    await user.save();
+    res.redirect("/feed");
+  } catch (error) {
+    console.error("Error occurred:", error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
+// router.post("/upload",isloggedin,upload.single("image"), async function(req,res){
+//   const user = await userModel.findOne({username: req.session.passport.user})
+  
+//   if(req.body.type === "post"){
+//     const result = await cloudinary.uploader.upload(req.file.path);
+//     const post = await postModel.create({
+//           picture: result.secure_url,
+//           user: user._id,
+//           caption: req.body.caption,
+      
+//         })
+//         console.log(post)
+//     user.posts.push(post._id);
+//   }
+//   else if(req.body.type === "story"){
+//     const result = await cloudinary.uploader.upload(req.file.path);
+//     const story = await storyModel.create({
+//           picture: result.secure_url,
+//           user: user._id,
+      
+//         })
+//         console.log(story)
+//     user.story.push(story._id);
+//   }
+//   await user.save();
+//   res.redirect("/feed")
+// })
 
 router.get("/like/story/:id", isloggedin, async function(req,res){
   const user = await userModel.findOne({ username: req.session.passport.user})
