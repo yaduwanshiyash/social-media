@@ -296,8 +296,8 @@ router.get('/logout', function(req, res, next){
 
 router.post("/update",upload.single('image'), async function(req,res,next){
   const user = await userModel.findOneAndUpdate({username: req.session.passport.user},{username: req.body.username,name: req.body.name,bio: req.body.bio},{new: true})
-  const result = await cloudinary.uploader.upload(req.file.path);
   if(req.file){
+    const result = await cloudinary.uploader.upload(req.file.path);
     user.profileImage = result.secure_url
   }
   await user.save();
