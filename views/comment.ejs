@@ -5,15 +5,17 @@
         <!-- Post Content -->
         <div class="bg-zinc-700 rounded-md shadow-md p-6 mb-8">
             <!-- Post Header -->
+            <a href="/userprofile/<%= post.user.username%>" class="outline-none">
             <div class="flex items-center mb-4">
                 <div class="w-12 h-12 rounded-full overflow-hidden mr-4">
-                    <!-- <img src="/images/uploads/<%= post.user.profileImage %>" alt="User Profile Image" class="object-cover w-full h-full"> -->
+                    <img src="<%= post.user.profileImage %>" alt="User Profile Image" class="object-cover w-full h-full">
                 </div>
                 <div>
-                    <h2 class="text-lg font-semibold"><%= post.user.username %></h2>
+                    <h2 class="text-lg font-semibold text-white"><%= post.user.username %></h2>
                     <!-- <p class="text-sm text-gray-600">@<%= post.user.username %></p> -->
                 </div>
             </div>
+        </a>
             <!-- Post Image -->
             <img src="<%= post.picture %>" alt="Post Image" class="w-full rounded-md mb-4">
             <!-- Post Caption -->

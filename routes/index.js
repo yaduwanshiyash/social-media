@@ -88,12 +88,17 @@ router.get('/userprofile/:username', isloggedin, async function(req, res) {
 
 router.get('/comment/:id', isloggedin, async function(req, res) {
   const user = await userModel.findOne({username: req.session.passport.user})
-  const post = await postModel.findOne({ _id: req.params.id }).populate({
-    path: 'comments',
-    populate: { path: 'user' } // Populate the 'user' field of each comment
-  });
+  const post = await postModel.findOne({ _id: req.params.id }).populate([
+    {
+      path: 'comments',
+      populate: { path: 'user' } // Populate the 'user' field of each comment
+    },
+    {
+      path: 'user' // Populate the 'user' field of the post
+    }
+  ]);
 
-  res.render('comment', {footer: true, user,post});
+  res.render('comment', {footer: true, user, post});
 });
 
 router.post('/createcomment/:id', isloggedin, async function(req, res) {
