@@ -4,7 +4,7 @@
     <div class="w-full px-4 flex items-center justify-between">
       <img class="w-1/4" src="/images/logo.png" alt="">
       <div class="icons -mt-2 flex gap-5 items-center">
-        <i class="text-[1.4rem] ri-heart-3-line"></i>
+        <a href="/notification"><i class="text-[1.4rem] ri-heart-3-line"></i></a>
         <i class="text-[1.4rem] ri-messenger-line"></i>
       </div>
     </div>
@@ -34,43 +34,74 @@
       <% }) %>
     </div>
     <div class="posts mb-20">
-      <% posts.reverse().forEach(function(elem){ %>
+      <% postsAndReels.reverse().forEach(function(elem){ %>
         <div class="post mt-10  w-full min-h-[50vh]">
           <div class="title px-4 flex items-center gap-2">
             <div class="w-[8vw] h-[8vw] md:w-[3vw]  md:h-[3vw] bg-sky-100 rounded-full overflow-hidden">
               <img class=" w-full h-full object-cover" src="<%= elem.user.profileImage %>" alt="">
             </div>
             <a href="/userprofile/<%= elem.user.username %>"><h4 class="text-sm"><%= elem.user.username %></h4></a>
-            <h6 class="text-xs opacity-30"><%= elem.date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) %></h6>
+            <% if (elem.date) { %>
+              <h6 class="text-xs opacity-30"><%= elem.date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) %></h6>
+            <% } else if (elem.publishedAt) { %>
+            <h6 class="text-xs opacity-30"><%= elem.publishedAt.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) %></h6>
+            <% } %>
           </div>
           <div class="w-full h-full rounded-lg overflow-hidden mt-4 bg-sky-100">
-            <img src="<%= elem.picture%>" alt="">
+            <% if (elem.picture) { %>
+              <img src="<%= elem.picture %>" alt="Post Image">
+            <% } else if (elem.source) { %>
+              <video autoplay loop muted src="<%= elem.source %>" class="w-full rounded-md mb-4"></video>
+            <% } %>
           </div>
           <div class="options w-full px-4 flex justify-between items-center text-[1.4rem]">
             <div class="flex gap-3 mt-2">
-              <a href="/like/post/<%= elem._id %>">
-                <% if(elem.likes.indexOf(user._id) !== -1){ %>
-                  <i class="ri-heart-3-fill text-red-600"></i>
-                <% }else{ %>
-                  <i class="ri-heart-3-line"></i>
-                <% } %>
-              </a>
-              <a href="/comment/<%= elem._id %>"><i class="ri-chat-3-line"></i></a>
-              <i class="ri-share-circle-line"></i>
-            </div>
-            <a href="/bookmark/<%= elem._id %>">
-              <% if(elem.bookmark.indexOf(user._id) !== -1){ %>
-                <i class="ri-bookmark-fill text-white"></i>
-              <% }else{ %>
-                <i class="ri-bookmark-line"></i>
+            <% if (elem.picture) { %>
+                <a href="/like/post/<%= elem._id %>">
+               
+            <% } else if (elem.source) { %>
+                <a href="/like/reel/<%= elem._id %>">
               <% } %>
-              
+              <% if(elem.likes.indexOf(user._id) !== -1){ %>
+                <i class="ri-heart-3-fill text-red-600"></i>
+              <% }else{ %>
+                <i class="ri-heart-3-line"></i>
+              <% } %>
             </a>
+              <% if (elem.picture) { %>
+                <a href="/comment/<%= elem._id %>"><i class="ri-chat-3-line"></i></a>
+                <% } else if (elem.source) { %>
+                  <a href="/comment/reel/<%= elem._id %>"><i class="ri-chat-3-line"></i></a>
+              <% } %>
+              <i class="ri-share-circle-line"></i>
+              </div>
+           
+            <% if (elem.bookmark) { %>
+              <a href="/bookmark/<%= elem._id %>">
+                <% if(elem.bookmark.indexOf(user._id) !== -1){ %>
+                  <i class="ri-bookmark-fill text-white"></i>
+                <% }else{ %>
+                  <i class="ri-bookmark-line"></i>
+                <% } %>
+                
+              </a>
+            <% } %>
+            
           </div>
-          <a href="/liked/post/<%= elem._id %>"><h3 class="px-4 mt-2 text-sm leading-none tracking-tight"><%= elem.likes.length%> likes</h3></a>
+          <% if (elem.picture) { %>
+            <a href="/liked/post/<%= elem._id %>"><h3 class="px-4 mt-2 text-sm leading-none tracking-tight"><%= elem.likes.length%> likes</h3></a>
+          <% } else if (elem.source) { %>
+            <a href="/liked/reel/<%= elem._id %>"><h3 class="px-4 mt-2 text-sm leading-none tracking-tight"><%= elem.likes.length%> likes</h3></a>
+          <% } %>
+          
           <h2 class="text-white font-light text-sm mt-2"><span class="font-semibold pl-4 pr-2"><%= elem.user.username%></span>
             <%= elem.caption%></h2>
-            <p>Time: <%= elem.date.toLocaleTimeString() %></p>
+            <% if (elem.date) { %>
+              <p>Time: <%= elem.date.toLocaleTimeString() %></p>
+            <% } else if (elem.publishedAt) { %>
+              <p>Time: <%= elem.publishedAt.toLocaleTimeString() %></p>
+            <% } %>
+            
         </div>
       <% }) %>
      
@@ -120,21 +151,21 @@ function formatRelativeTime(date) {
       return `${weeks}w`;
     }
     
-    document.addEventListener('DOMContentLoaded', function () {
-      document.querySelector('.like-button').addEventListener('click', function () {
-        const postId = this.getAttribute('data-post-id');
+    // document.addEventListener('DOMContentLoaded', function () {
+    //   document.querySelector('.like-button').addEventListener('click', function () {
+    //     const postId = this.getAttribute('data-post-id');
   
-        // Send a POST request to the server using Axios
-        axios.post(`/like/post/${postId}`)
-          .then(response => {
-            // Update the UI to reflect the new like status
-            console.log('Post liked successfully');
-          })
-          .catch(error => {
-            console.error('Error liking post', error);
-          });
-      });
-    });
+    //     // Send a POST request to the server using Axios
+    //     axios.post(`/like/post/${postId}`)
+    //       .then(response => {
+    //         // Update the UI to reflect the new like status
+    //         console.log('Post liked successfully');
+    //       })
+    //       .catch(error => {
+    //         console.error('Error liking post', error);
+    //       });
+    //   });
+    // });
   </script>
 
   <% include ./partials/footer.ejs %>

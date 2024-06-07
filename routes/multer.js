@@ -13,7 +13,7 @@ const storage = multer.diskStorage({
   })
 
   const fileFilter = (req, file, cb) => {
-    const allowedFileTypes = ['.png', '.jpg'];
+    const allowedFileTypes = ['.png', '.jpg','.mp4', '.mkv', '.avi', '.mov'];
   
     // Check if the file extension is in the allowed list
     const fileExtension = path.extname(file.originalname).toLowerCase();
@@ -26,7 +26,7 @@ const storage = multer.diskStorage({
   
   // Set up Multer limits
   const limits = {
-    fileSize: 5 * 1024 * 1024, // 5 MB limit
+    fileSize: 15 * 1024 * 1024, // 5 MB limit
   };
   
   const upload = multer({ storage: storage, fileFilter: fileFilter, limits: limits });
