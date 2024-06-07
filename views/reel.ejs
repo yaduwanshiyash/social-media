@@ -1,0 +1,108 @@
+<% include ./partials/header.ejs %>
+  <div class=" w-full bg-zinc-900">
+  <div class="w-full md:w-[40vw] md:mx-auto min-h-screen bg-white dark:bg-zinc-900 text-zinc-950 dark:text-white py-5">
+    <div class="w-full px-4 flex items-center justify-between">
+      <img class="w-1/4" src="/images/logo.png" alt="">
+      <div class="icons -mt-2 flex gap-5 items-center">
+        <a href="/notification"><i class="text-[1.4rem] ri-heart-3-line"></i></a>
+        <i class="text-[1.4rem] ri-messenger-line"></i>
+      </div>
+    </div>
+    <div class="posts mb-20">
+      <% reels.reverse().forEach(function(elem){ %>
+        <div class="post mt-10  w-full min-h-[50vh]">
+          <div class="title px-4 flex items-center gap-2 ">
+            <div class="w-[8vw] h-[8vw] md:w-[3vw]  md:h-[3vw] bg-sky-100 rounded-full overflow-hidden">
+              <img class=" w-full h-full object-cover" src="<%= elem.user.profileImage %>" alt="">
+            </div>
+            <a href="/userprofile/<%= elem.user.username %>"><h4 class="text-sm"><%= elem.user.username %></h4></a>
+          </div>
+          <div class="w-full flex items-center justify-center mx-auto h-fit rounded-lg overflow-hidden mt-4 ">
+            <video  class=" h-fit w-full object-cover object-center" muted autoplay loop src="<%= elem.source%>"></video>
+          </div>
+          <div class="options w-full px-4 flex justify-between items-center text-[1.4rem]">
+            <div class="flex gap-3 mt-2">
+             
+              <a href="/like/reel/<%= elem._id %>">
+                <% if(elem.likes.indexOf(user._id) !== -1){ %>
+                  <i class="ri-heart-3-fill text-red-600"></i>
+                <% }else{ %>
+                  <i class="ri-heart-3-line"></i>
+                <% } %>
+              </a>
+              
+              <a href="/comment/reel/<%= elem._id %>"><i class="ri-chat-3-line"></i></a>
+              <i class="ri-share-circle-line"></i>
+            </div>
+        
+          </div>
+          <a href="/liked/reel/<%= elem._id %>"><h3 class="px-4 mt-2 text-sm leading-none tracking-tight"><%= elem.likes.length%> likes</h3></a>
+          <h2 class="text-white font-light text-sm mt-2"><span class="font-semibold pl-4 pr-2"><%= elem.user.username%></span>
+            <%= elem.caption%></h2>
+        </div>
+      <% }) %>
+     
+      
+    </div>
+  </div>
+</div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/1.6.7/axios.min.js"
+  integrity="sha512-NQfB/bDaB8kaSXF8E77JjhHG5PM6XVRxvHzkZiwl3ddWCEPBa23T76MuWSwAJdMGJnmQqM0VeY9kFszsrBEFrQ=="
+  crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"
+  integrity="sha512-7eHRwcbYkK4d9g/6tD/mhkf++eoTHwpNM9woBxtPUBWm67zeAfFC+HrdoE2GanKeocly/VxeLvIqwvCdk7qScg=="
+  crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <script>
+
+function formatRelativeTime(date) {
+      const now = new Date();
+      const diff = now - date;
+
+      // Convert milliseconds to seconds
+      const seconds = Math.floor(diff / 1000);
+
+      if (seconds < 60) {
+        return `${seconds}s`;
+      }
+
+      const minutes = Math.floor(seconds / 60);
+
+      if (minutes < 60) {
+        return `${minutes}m`;
+      }
+
+      const hours = Math.floor(minutes / 60);
+
+      if (hours < 24) {
+        return `${hours}h`;
+      }
+
+      const days = Math.floor(hours / 24);
+
+      if (days < 7) {
+        return `${days}d`;
+      }
+
+      const weeks = Math.floor(days / 7);
+
+      return `${weeks}w`;
+    }
+    
+    document.addEventListener('DOMContentLoaded', function () {
+      document.querySelector('.like-button').addEventListener('click', function () {
+        const postId = this.getAttribute('data-post-id');
+  
+        // Send a POST request to the server using Axios
+        axios.post(`/like/post/${postId}`)
+          .then(response => {
+            // Update the UI to reflect the new like status
+            console.log('Post liked successfully');
+          })
+          .catch(error => {
+            console.error('Error liking post', error);
+          });
+      });
+    });
+  </script>
+
+  <% include ./partials/footer.ejs %>

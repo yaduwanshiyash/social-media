@@ -22,6 +22,10 @@ const userSchema = mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'story'
   }],
+  videos: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'video'
+  }],
   followers: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: "user",

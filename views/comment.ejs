@@ -16,9 +16,12 @@
                 </div>
             </div>
         </a>
-            <!-- Post Image -->
-            <img src="<%= post.picture %>" alt="Post Image" class="w-full rounded-md mb-4">
-            <!-- Post Caption -->
+             <!-- Post Media -->
+             <% if (post.picture) { %>
+                <img src="<%= post.picture %>" alt="Post Image" class="w-full rounded-md mb-4">
+            <% } else if (post.source) { %>
+                <video autoplay loop controls src="<%= post.source %>" class="w-full rounded-md mb-4"></video>
+            <% } %>
             <p class="text-gray-100 mb-4"><%= post.caption %></p>
         </div>
         
