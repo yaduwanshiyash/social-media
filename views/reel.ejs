@@ -12,33 +12,27 @@
       <% reels.reverse().forEach(function(elem){ %>
         <div class="post mt-10  w-full min-h-[50vh]">
           <div class="title px-4 flex items-center gap-2 ">
-            <div class="w-[8vw] h-[8vw] md:w-[3vw]  md:h-[3vw] bg-sky-100 rounded-full overflow-hidden">
+            <div class="w-[8vw] h-[8vw] md:w-[3vw]  md:h-[3vw]  rounded-full overflow-hidden">
               <img class=" w-full h-full object-cover" src="<%= elem.user.profileImage %>" alt="">
             </div>
             <a href="/userprofile/<%= elem.user.username %>"><h4 class="text-sm"><%= elem.user.username %></h4></a>
           </div>
           <div class="w-full flex items-center justify-center mx-auto h-fit rounded-lg overflow-hidden mt-4 ">
-            <video  class=" h-fit w-full object-cover object-center" muted autoplay loop src="<%= elem.source%>"></video>
+            <video data-id="<%= elem._id %>"  class="postimg h-fit w-full object-cover object-center" muted autoplay loop src="<%= elem.source%>"></video>
           </div>
           <div class="options w-full px-4 flex justify-between items-center text-[1.4rem]">
             <div class="flex gap-3 mt-2">
              
-              <a href="/like/reel/<%= elem._id %>">
-                <% if(elem.likes.indexOf(user._id) !== -1){ %>
-                  <i class="ri-heart-3-fill text-red-600"></i>
-                <% }else{ %>
-                  <i class="ri-heart-3-line"></i>
-                <% } %>
-              </a>
+              <i data-id="<%= elem._id %>"
+                class="like <%= elem.likes.indexOf(user.id) === -1 ? 'ri-heart-3-line' : 'text-red-500 ri-heart-3-fill' %>"></i>
               
               <a href="/comment/reel/<%= elem._id %>"><i class="ri-chat-3-line"></i></a>
               <i class="ri-share-circle-line"></i>
             </div>
         
           </div>
-          <a href="/liked/reel/<%= elem._id %>"><h3 class="px-4 mt-2 text-sm leading-none tracking-tight"><%= elem.likes.length%> likes</h3></a>
-          <h2 class="text-white font-light text-sm mt-2"><span class="font-semibold pl-4 pr-2"><%= elem.user.username%></span>
-            <%= elem.caption%></h2>
+          <a href="/liked/reel/<%= elem._id %>"><h3 class="likes px-4 mt-2 text-sm leading-none tracking-tight"><%= elem.likes.length%> likes</h3></a>
+          <h2 class="dark:text-white text-black text-sm px-4 font-semibold mt-2"><%= elem.caption%></h2>
         </div>
       <% }) %>
      
@@ -53,6 +47,89 @@
   integrity="sha512-7eHRwcbYkK4d9g/6tD/mhkf++eoTHwpNM9woBxtPUBWm67zeAfFC+HrdoE2GanKeocly/VxeLvIqwvCdk7qScg=="
   crossorigin="anonymous" referrerpolicy="no-referrer"></script>
   <script>
+
+function handleLike() {
+  document.querySelector(".posts")
+    .addEventListener("click", function (ev) {
+      if (ev.target.classList.contains('like')) {
+        var icon = ev.target;
+
+        axios(`/like/reel/${ev.target.dataset.id}`)
+          .then(function (res) {
+            if (icon.classList.contains('ri-heart-3-line')) {
+              icon.classList.remove('ri-heart-3-line');
+              icon.classList.add('ri-heart-3-fill', 'text-red-500');
+            }
+            else {
+              icon.classList.add('ri-heart-3-line');
+              icon.classList.remove('ri-heart-3-fill', 'text-red-500');
+            }
+            ev.target.parentNode.parentNode.parentNode.querySelector('.likes').textContent = res.data.likes.length + ' likes';
+          });
+      }
+    })
+}
+
+function makeHeartAnimation() {
+  document.querySelector(".posts").addEventListener("click", function (ev) {
+    if (ev.target.classList.contains('postimg')) {
+      var icon = document.createElement('i');
+      icon.classList.add('ri-heart-3-fill', 'text-6xl', 'text-red-500', 'z-[34]', 'absolute', 'top-1/2', 'left-1/2', '-translate-x-1/2', '-translate-y-1/2');
+      ev.target.parentNode.parentNode.appendChild(icon);
+
+      axios.get(`/like/reel/${ev.target.dataset.id}`)
+        .then(function (response) {
+
+          var iconElement = ev.target.parentNode.parentNode.querySelector('.like');
+          if (iconElement.classList.contains('ri-heart-3-line')) {
+            iconElement.classList.remove('ri-heart-3-line');
+            iconElement.classList.add('ri-heart-3-fill', 'text-red-500');
+          } else {
+            iconElement.classList.add('ri-heart-3-line');
+            iconElement.classList.remove('ri-heart-3-fill', 'text-red-500');
+          }
+
+          var likes = ev.target.parentNode.parentNode.querySelector(".likes");
+
+          if (response.data && response.data.likes) {
+            likes.textContent = response.data.likes.length + ' likes';
+          } else {
+            console.error('Unexpected response structure:', response.data);
+          }
+        })
+        .catch(function (error) {
+          console.error('Error:', error); 
+        });
+
+      gsap.from(icon, {
+        y: 20,
+        opacity: 0,
+        ease: 'linear',
+        onComplete: function () {
+          ev.target.parentNode.parentNode.removeChild(icon);
+        }
+      });
+    }
+  });
+}
+
+function handleSave(){
+  var save = document.querySelector(".posts");
+  save.addEventListener("click", function(ev){
+    if(ev.target.classList.contains("save")){
+      axios.get(`/bookmark/${ev.target.dataset.id}`)
+      .then(function(res){
+        if(ev.target.classList.contains('ri-bookmark-line')){
+          ev.target.classList.add('ri-bookmark-fill', 'text-white');
+          ev.target.classList.remove('ri-bookmark-line');
+        }
+      })
+    }
+  });
+}
+handleLike();
+handleSave();
+makeHeartAnimation();
 
 function formatRelativeTime(date) {
       const now = new Date();

@@ -4,6 +4,7 @@ const userModel = require("./users")
 const postModel = require("./post")
 const storyModel = require("./story")
 const commentModel = require("./comment")
+const notificationModel = require("./notification")
 const videoModel = require("./video")
 const passport = require('passport')
 const localStrategy = require("passport-local")
@@ -302,6 +303,13 @@ router.post('/createcomment/:id', isloggedin, async function(req, res) {
 //   res.render('back', {footer: true});
 // });
 
+
+router.get('/profilenew', isloggedin, async function(req, res) {
+  const user = await userModel.findOne({username: req.session.passport.user}).populate("posts")
+  const posts = await postModel.find()
+
+  res.render('profilenew', {footer: true, user,posts});
+});
 router.get('/profile', isloggedin, async function(req, res) {
   const user = await userModel.findOne({username: req.session.passport.user}).populate("posts")
 
@@ -581,53 +589,53 @@ router.get("/like/reel/:id", isloggedin, async function(req, res) {
     }
 
     await reel.save();
-    res.redirect('back');
+    res.json(reel);
   } catch (error) {
     console.error("Error occurred while liking reel:", error);
     res.status(500).json({ error: "Internal Server Error" });
   }
 });
-
-// router.get("/like/post/:id", isloggedin, async function(req,res){
-//   const user = await userModel.findOne({ username: req.session.passport.user})
-//   const post = await postModel.findOne({_id: req.params.id})
-
-//   if(post.likes.indexOf(user._id) == -1){
-//     post.likes.push(user._id)
-//   }
-//   else{
-//     post.likes.splice(post.likes.indexOf(user._id), 1)
-//   }
-
-//   await post.save();
-//   res.redirect('back')
-// })
-
-router.post("/like/post/:id", isloggedin, async function(req, res) {
+router.get("/like/post/:id", isloggedin, async function(req, res) {
   try {
-    const postId = req.params.id;
     const user = await userModel.findOne({ username: req.session.passport.user });
-    const post = await postModel.findById(postId);
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
 
-    if (!user || !post) {
-      return res.status(404).json({ error: "User or post not found" });
+    const post = await postModel.findOne({ _id: req.params.id });
+    if (!post) {
+      return res.status(404).json({ error: "Post not found" });
     }
 
     const userIndex = post.likes.indexOf(user._id);
+
     if (userIndex === -1) {
       post.likes.push(user._id);
     } else {
       post.likes.splice(userIndex, 1);
     }
 
+    if (user._id.toString() !== post.user._id.toString()) {
+      const notification = await notificationModel.create({
+        sender: user._id,
+        content: req.params.id,
+        recipient: post.user._id
+      });
+
+      console.log("Notification created:", notification);
+
+      user.notifications.push(notification._id);
+      await user.save();
+    }
+
     await post.save();
-    // Return updated post data, including likes count
-    res.json({ likesCount: post.likes.length });
+    res.json(post);
   } catch (error) {
-    console.error("Error toggling like:", error);
+    console.error("Error occurred while liking post:", error);
     res.status(500).json({ error: "Internal Server Error" });
   }
 });
+
 
 
 router.get("/like/comment/:id", isloggedin, async function(req,res){
@@ -732,13 +740,28 @@ router.get("/bookmark/:id", isloggedin, async function(req,res){
   await newpost.save();
   await user.save();
  
-  res.redirect("back");
+  res.json(newpost);
 })
 
 router.get('/notification', isloggedin, async function(req, res) {
-  const user = await userModel.findOne({ username: req.session.passport.user})
-  res.render('notify', {footer: true, user});
+  try {
+    const user = await userModel.findOne({ username: req.session.passport.user })
+    .populate({
+      path: 'notifications',
+      populate: [
+        { path: 'sender' },
+        { path: 'content' }
+      ]
+    });
+
+    console.log(user);
+    res.render('notify', { footer: true, user });
+  } catch (error) {
+    console.error("Error occurred while populating notifications:", error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
 });
+
 router.get('/followers/:username', isloggedin, async function(req, res) {
   const user = await userModel.findOne({ username: req.session.passport.user})
   const another = await userModel.findOne({username: req.params.username}).populate("followers")

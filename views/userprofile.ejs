@@ -51,32 +51,29 @@
                 <img class=" w-full h-full object-cover" src="<%= other.profileImage %>" alt="">
               </div>
               <h4 class="text-sm"><%= other.username %></h4>
-              <h6 class="text-xs opacity-30"><%= post.date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) %></h6>
+              <h6 class="text-xs opacity-80 dark:opacity-30"><%= post.date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) %>
+              </h6>
             </div>
-            <div class="w-full h-60 mt-4 bg-sky-100 overflow-hidden">
-              <img class=" h-full w-full object-cover object-center" src="<%= post.picture%>" alt="">
+            <div class="w-full h-60 mt-4 bg-sky-100">
+              <img data-id="<%= post._id %>" class="postimg h-full w-full object-cover object-center" src="<%= post.picture%>" alt="">
             </div>
             <div class="options w-full px-4 flex justify-between items-center text-[1.4rem]">
               <div class="flex gap-3 mt-2">
-                <a href="/like/post/<%= post._id %>">
-                  <% if(post.likes.indexOf(user._id) !== -1){ %>
-                    <i class="ri-heart-3-fill text-red-600"></i>
-                  <% }else{ %>
-                    <i class="ri-heart-3-line"></i>
-                  <% } %>
-                </a>
-                <i class="ri-chat-3-line"></i>
+                <i data-id="<%= post._id %>"
+                  class="like <%= post.likes.indexOf(user.id) === -1 ? 'ri-heart-3-line' : 'text-red-500 ri-heart-3-fill' %>"></i>
+                <a href="/comment/<%= post._id %>"><i class="ri-chat-3-line"></i></a>
                 <i class="ri-share-circle-line"></i>
               </div>
-              <i class="ri-bookmark-line"></i>
+             <i data-id="<%= post._id %>" class="save <%= user.bookmarks.indexOf(post._id) === -1 ? 'ri-bookmark-line' : 'ri-bookmark-fill text-white' %>"></i>
             </div>
-            <h3 class="px-4 mt-2 text-sm leading-none tracking-tight"><%= post.likes.length%> likes</h3>
-              <%= post.caption%></h2>
-              <p>Time: <%= post.date.toLocaleTimeString() %></p>
+            <h3 class="likes px-4 mt-2 text-sm leading-none tracking-tight">
+              <%= post.likes.length %> likes
+            </h3>
+              <h2 class=" px-4"><%= post.caption%></h2>
+              <p class=" px-4 text-xs"><%= post.date.toLocaleTimeString() %></p>
+
           </div>
-          <!-- <div class="post w-[32.5%] h-32 bg-sky-100 overflow-hidden">
-            <img class=" w-full h-full object-cover" src="<%= post.picture %>" alt="">
-          </div> -->
+            
         <% }) %>
         
       </div>

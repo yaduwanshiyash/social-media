@@ -49,7 +49,7 @@
               </h6>
             </div>
             <div class="w-full h-60 mt-4 bg-sky-100">
-              <img data-id="<%= post._id %>" class="postimg h-full w-full object-cover object-center" src="<%= post.picture%>" alt="">
+              <img class=" h-full w-full object-cover object-center" src="<%= post.picture%>" alt="">
             </div>
             <div class="options w-full px-4 flex justify-between items-center text-[1.4rem]">
               <div class="flex gap-3 mt-2">
@@ -60,11 +60,16 @@
               </div>
              <!-- <a href="/delete/post/<%= post._id %>"> <i class="ri-delete-bin-6-line"></i></a> -->
              <a href="/delete/post/<%= post._id %>" ><i class="ri-delete-bin-6-line"></i></a>
-             <i data-id="<%= post._id %>" class="save <%= user.bookmarks.indexOf(post._id) === -1 ? 'ri-bookmark-line' : 'ri-bookmark-fill text-white' %>"></i>
+             <a href="/bookmark/<%= post._id %>">
+              <% if(post.bookmark.indexOf(user._id) !== -1){ %>
+                <i class="ri-bookmark-fill text-white"></i>
+              <% }else{ %>
+                <i class="ri-bookmark-line"></i>
+              <% } %>
+              
+            </a>
             </div>
-            <h3 class="likes px-4 mt-2 text-sm leading-none tracking-tight">
-              <%= post.likes.length %> likes
-            </h3>
+            <a href="/liked/post/<%= post._id %>"><h3 class="px-4 mt-2 text-sm leading-none tracking-tight"><%= post.likes.length%> likes</h3></a>
               <h2 class=" px-4"><%= post.caption%></h2>
               <p class=" px-4 text-xs"><%= post.date.toLocaleTimeString() %></p>
 
@@ -90,7 +95,7 @@ function handleLike() {
       if (ev.target.classList.contains('like')) {
         var icon = ev.target;
 
-        axios(`/like/post/${ev.target.dataset.id}`)
+        axios(`/like/${ev.target.dataset.id}`)
           .then(function (res) {
             if (icon.classList.contains('ri-heart-3-line')) {
               icon.classList.remove('ri-heart-3-line');
@@ -100,6 +105,7 @@ function handleLike() {
               icon.classList.add('ri-heart-3-line');
               icon.classList.remove('ri-heart-3-fill', 'text-red-500');
             }
+
             ev.target.parentNode.parentNode.parentNode.querySelector('.likes').textContent = res.data.likes.length + ' likes';
           });
       }
@@ -107,53 +113,46 @@ function handleLike() {
 }
 
 function makeHeartAnimation() {
-  document.querySelector(".posts").addEventListener("click", function (ev) {
-    if (ev.target.classList.contains('postimg')) {
-      var icon = document.createElement('i');
-      icon.classList.add('ri-heart-3-fill', 'text-6xl', 'text-red-500', 'z-[34]', 'absolute', 'top-1/2', 'left-1/2', '-translate-x-1/2', '-translate-y-1/2');
-      ev.target.parentNode.parentNode.appendChild(icon);
+  document.querySelector(".posts")
+    .addEventListener("click", function (ev) {
+      if (ev.target.classList.contains('postimg')) {
+        var icon = document.createElement('i');
+        icon.classList.add('ri-heart-3-fill', 'text-6xl', 'text-red-500', 'z-[34]', 'absolute', 'top-1/2', 'left-1/2', '-translate-x-1/2', '-translate-y-1/2');
+        ev.target.parentNode.parentNode.appendChild(icon);
 
-      axios.get(`/like/post/${ev.target.dataset.id}`)
-        .then(function (response) {
+        axios.get(`/like/${ev.target.dataset.id}`)
+        .then(function(response){
+          var icon = ev.target.parentNode.parentNode.querySelector('.like');
+          if (icon.classList.contains('ri-heart-3-line')) {
+              icon.classList.remove('ri-heart-3-line');
+              icon.classList.add('ri-heart-3-fill', 'text-red-500');
+            }
+            else {
+              icon.classList.add('ri-heart-3-line');
+              icon.classList.remove('ri-heart-3-fill', 'text-red-500');
+            }
 
-          var iconElement = ev.target.parentNode.parentNode.querySelector('.like');
-          if (iconElement.classList.contains('ri-heart-3-line')) {
-            iconElement.classList.remove('ri-heart-3-line');
-            iconElement.classList.add('ri-heart-3-fill', 'text-red-500');
-          } else {
-            iconElement.classList.add('ri-heart-3-line');
-            iconElement.classList.remove('ri-heart-3-fill', 'text-red-500');
-          }
-
-          var likes = ev.target.parentNode.parentNode.querySelector(".likes");
-
-          if (response.data && response.data.likes) {
+            var likes = ev.target.parentNode.parentNode.querySelector(".likes");
             likes.textContent = response.data.likes.length + ' likes';
-          } else {
-            console.error('Unexpected response structure:', response.data);
+        })
+
+        gsap.from(icon, {
+          y: 20,
+          opacity: 0,
+          ease: 'linear',
+          onComplete: function(){
+            ev.target.parentNode.parentNode.removeChild(icon);
           }
         })
-        .catch(function (error) {
-          console.error('Error:', error); 
-        });
-
-      gsap.from(icon, {
-        y: 20,
-        opacity: 0,
-        ease: 'linear',
-        onComplete: function () {
-          ev.target.parentNode.parentNode.removeChild(icon);
-        }
-      });
-    }
-  });
+      }
+    })
 }
 
 function handleSave(){
   var save = document.querySelector(".posts");
   save.addEventListener("click", function(ev){
     if(ev.target.classList.contains("save")){
-      axios.get(`/bookmark/${ev.target.dataset.id}`)
+      axios.get(`/save/${ev.target.dataset.id}`)
       .then(function(res){
         if(ev.target.classList.contains('ri-bookmark-line')){
           ev.target.classList.add('ri-bookmark-fill', 'text-white');

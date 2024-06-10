@@ -18,6 +18,10 @@ const userSchema = mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'post'
   }],
+  notifications: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'notification'
+  }],
   story: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: 'story'
