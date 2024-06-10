@@ -22,14 +22,14 @@
             clutter = ""
             data.data.forEach(function(elem){
                 clutter += ` <a href="/userprofile/${elem.username}" class="outline-none">
-            <div class="text-white flex items-center p-3 rounded-xl bg-white dark:bg-zinc-800 text-zinc-950 dark:text-white gap-2 mt-5">
+            <div class="text-white flex items-center p-3 rounded-xl bg-zinc-300 dark:bg-zinc-800 text-zinc-950 dark:text-white gap-2 mt-5">
                 <div class="image w-[11vw] h-[11vw] md:w-[4vw]  md:h-[4vw] object-cover object-center rounded-full overflow-hidden">
                     <img src="${elem.profileImage}" alt="">
                 </div>
                 <div class="text">
                     <h3>${elem.username}</h3>
-                    <h4 class="text-xs opacity-30 leading-none">${elem.name}</h4>
-                    <h4 class="text-xs opacity-30 leading-none">${elem.email}</h4>
+                    <h4 class="text-xs opacity-80 dark:opacity-30  leading-none">${elem.name}</h4>
+                    <h4 class="text-xs opacity-80 dark:opacity-30  leading-none">${elem.email}</h4>
                 </div>
             </div>            
         </a>`
