@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Your Friends</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Arial', sans-serif;
+        }
+
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #1f1f1f;
+            color: #f3f4f6;
+        }
+
+        .friends-container {
+            width: 100%;
+            max-width: 600px;
+            background-color: #252525;
+            border-radius: 10px;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.5);
+            overflow: hidden;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .header h2 {
+            font-size: 1.8rem;
+            color: #f3f4f6;
+        }
+
+        .back-button {
+            display: inline-block;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 5px;
+            background-color: #333;
+            color: #f3f4f6;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+            text-decoration: none;
+            font-size: 1.2rem;
+            margin-bottom: 20px;
+            text-align: center;
+            width: fit-content;
+            display: block;
+        }
+
+        .back-button:hover {
+            background-color: #444;
+        }
+
+        .friends-list {
+            list-style: none;
+            padding: 0;
+        }
+
+        .friend-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 15px;
+            margin-bottom: 15px;
+            border-radius: 8px;
+            background-color: #333;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .friend-item:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+        }
+
+        .friend-avatar {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            object-fit: cover;
+            margin-right: 15px;
+        }
+
+        .friend-info {
+            display: flex;
+            align-items: center;
+            flex: 1;
+        }
+
+        .friend-item a {
+            text-decoration: none;
+            color: #f3f4f6;
+            font-size: 1.2rem;
+        }
+
+        .start-chat-btn {
+            background-color: #3b82f6;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        .start-chat-btn:hover {
+            background-color: #2563eb;
+        }
+
+        .no-friends-message {
+            text-align: center;
+            color: #f3f4f6;
+            font-size: 1.2rem;
+            margin-top: 20px;
+        }
+
+        @media screen and (max-width: 768px) {
+            .friends-container {
+                max-width: 90%;
+            }
+
+            .friend-item {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .start-chat-btn {
+                margin-top: 10px;
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="friends-container">
+        <button class="back-button" onclick="window.history.back()">Back</button>
+        <div class="header">
+            <h2>Your Friends</h2>
+        </div>
+        <% if (friends.length > 0) { %>
+            <ul class="friends-list">
+                <% friends.forEach(friend => { %>
+                    <li class="friend-item">
+                        <div class="friend-info">
+                            <img class="friend-avatar" src="<%= friend.profileImage %>" alt="avatar">
+                            <a href="/chat/<%= friend._id %>"><%= friend.username %></a>
+                        </div>
+                        <button class="start-chat-btn" onclick="window.location.href='/chat/<%= friend._id %>'">Chat</button>
+                    </li>
+                <% }) %>
+            </ul>
+        <% } else { %>
+            <p class="no-friends-message">You have no friends yet. <a href="/feed" style="color: #3b82f6;">Make more friends!</a></p>
+        <% } %>
+    </div>
+</body>
+</html>

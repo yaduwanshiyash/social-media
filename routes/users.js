@@ -6,8 +6,10 @@ mongoose.connect(process.env.MONGO_URL).then(() => console.log('Connected!'));
 
 const userSchema = mongoose.Schema({
   username:String,
+  socketId: String,
   name: String,
   email: String,
+  online: { type: Boolean, default: false },
   password: String,
   profileImage: {
     type: String,

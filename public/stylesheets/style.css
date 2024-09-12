@@ -5,3 +5,95 @@
 a:focus {
   outline: none !important;
 }
+
+body {
+  font-family: Arial, sans-serif;
+  margin: 0;
+  padding: 0;
+}
+
+.chat-container {
+  display: flex;
+  height: 100vh;
+}
+
+.friends-list {
+  width: 20%;
+  background-color: #f1f1f1;
+  padding: 10px;
+  border-right: 1px solid #ccc;
+}
+
+.friends-list h3 {
+  margin-top: 0;
+}
+
+.friends-list ul {
+  list-style: none;
+  padding: 0;
+}
+
+.friends-list ul li {
+  margin-bottom: 10px;
+}
+
+.friends-list ul li a {
+  text-decoration: none;
+  color: #333;
+}
+
+.friends-list ul li a:hover {
+  color: #007bff;
+}
+
+.chat-box {
+  width: 80%;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+}
+
+#messages {
+  flex-grow: 1;
+  border: 1px solid #ccc;
+  padding: 10px;
+  overflow-y: scroll;
+  height: 60vh;
+}
+
+.message {
+  margin-bottom: 10px;
+}
+
+.message.sent {
+  text-align: right;
+}
+
+.message.received {
+  text-align: left;
+}
+
+#message-form {
+  display: flex;
+  margin-top: 20px;
+}
+
+#message-form input {
+  flex-grow: 1;
+  padding: 10px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+
+#message-form button {
+  padding: 10px;
+  border: none;
+  background-color: #007bff;
+  color: white;
+  cursor: pointer;
+  margin-left: 10px;
+}
+
+#message-form button:hover {
+  background-color: #0056b3;
+}

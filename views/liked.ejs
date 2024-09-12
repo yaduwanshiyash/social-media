@@ -1,7 +1,8 @@
 <% include ./partials/header.ejs %>
 <div class="md:w-[40vw] md:mx-auto">
 <div class="nav flex bg-white dark:bg-zinc-900  text-zinc-950 dark:text-white justify-between items-center px-4">
-    <a class="text-sm text-blue-500" href="/profile"><i class="ri-arrow-left-s-line"></i> Back</a>
+    <button class="text-sm text-blue-500" onclick="window.history.back()"><i class="ri-arrow-left-s-line"></i> Back</button>
+
     <h4><%= user.username %>'s likes</h4>
     <div class="icons flex gap-5">
       <i class="text-[1.4rem] ri-menu-line"></i>
