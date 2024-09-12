@@ -2,6 +2,8 @@ var express = require('express');
 var router = express.Router();
 const userModel = require("./users")
 const postModel = require("./post")
+const mongoose = require('mongoose')
+const Message = require('./chat');
 const storyModel = require("./story")
 const commentModel = require("./comment")
 const notificationModel = require("./notification")
@@ -29,20 +31,57 @@ router.get('/login', function(req, res) {
   res.render('login', {footer: false});
 });
 
-// router.get('/feed', isloggedin , async function(req, res) {
-//   const user = await userModel.findOne({username: req.session.passport.user})
-//   const post = await postModel.find().populate("user")
-//   const story = await storyModel.find().populate("user")
+router.get('/chat', isloggedin, async function(req, res) {
+  try {
+      const user = await userModel.findOne({ username: req.session.passport.user }).populate('followings').exec();
+      if (!user) {
+          return res.status(404).send('User not found');
+      }
+      res.render('friends', { footer: true, user, friends: user.followings });
+  } catch (err) {
+      console.error(err);
+      res.status(500).send('Server Error');
+  }
+});
 
-//   var obj = {};
-//   const packs = story.filter(function(story){
-//     if(!obj[story.user._id]){
-//       obj[story.user._id] = "ascbvjanscm";
-//       return true;
-//     }
-//   })
-//   res.render('feed', {footer: true, post,user,story,stories: packs, dater: utils.formatRelativeTime});
-// });
+// GET chat history with a specific friend
+
+
+
+router.get('/chat/:friendId', isloggedin, async (req, res) => {
+    try {
+        const { friendId } = req.params;
+        const user = await userModel.findOne({ username: req.session.passport.user }).populate('followings').exec();
+
+        if (!user) {
+            return res.status(404).send('User not found');
+        }
+
+        // Convert to ObjectId using mongoose.Types.ObjectId()
+        // const userId = mongoose.Types.ObjectId(user._id);
+        // const friendObjectId = mongoose.Types.ObjectId(friendId);
+
+        const messages = await Message.find({
+            $or: [
+                { sender: user, receiver: friendId },
+                { sender: friendId, receiver: user }
+            ]
+        }).sort({ timestamp: 1 });
+
+        const friend = await userModel.findById(friendId);
+        if (!friend) {
+            return res.status(404).send('Friend not found');
+        }
+
+        res.render('chat', { friend, friends: user.followings, messages, user });
+    } catch (err) {
+        console.error(err);
+        res.status(500).send('Server Error');
+    }
+});
+
+
+
 
 
 router.get("/reel", isloggedin, async function(req, res) {
@@ -62,54 +101,6 @@ router.get("/reel", isloggedin, async function(req, res) {
   }
 });
 
-
-// router.get("/feed", isloggedin, async function(req, res) {
-//   try {
-//     const user = await userModel.findOne({ username: req.session.passport.user });
-
-//     if (!user) {
-//       return res.status(404).send("User not found");
-//     }
-
-//     const posts = await postModel.find().populate('user');
-
-//     const stories = await storyModel.find({ user: { $ne: user._id } }).populate('user');
-
-//     const uniqueStories = {};
-//     const filteredStories = stories.filter(story => {
-//       if (!uniqueStories[story.user._id]) {
-//         uniqueStories[story.user._id] = true;
-//         return true;
-//       }
-//       return false;
-//     });
-
-//     res.render("feed", { footer: true, posts, user, stories: filteredStories });
-//   } catch (error) {
-//     console.error("Error occurred while fetching feed:", error);
-//     res.status(500).send("Internal Server Error");
-//   }
-// });
-
-// router.get("/feed", isloggedin, async function (req, res) {
-//   const user = await userModel.findOne({ username: req.session.passport.user });
-//   const posts = await postModel
-//   .find()
-//   .populate('user')
-
-//   const stories = await storyModel.find({user: {$ne: user._id}})
-//   .populate('user');
-
-//   var obj = {};
-//   const packs = stories.filter(function(story){
-//     if(!obj[story.user._id]){
-//       obj[story.user._id] = "ascbvjanscm";
-//       return true;
-//     }
-//   })
-
-//   res.render("feed", { footer: true, posts, user, stories: packs });
-// });
 
 router.get("/feed", isloggedin, async function(req, res) {
   try {
@@ -287,21 +278,6 @@ router.post('/createcomment/:id', isloggedin, async function(req, res) {
 });
 
 
-// router.post('/createcomment', isloggedin, async function(req, res) {
-//   const user = await userModel.findOne({username: req.session.passport.user}).populate("posts")
-//   const post = await postModel.findOne({_id: req.params.id})
-//   console.log(post)
-//   const comment = await commentModel.create({
-//     comment: req.body.comment,
-//     user: user._id,
-//     whichpost:params.id,
-//   })
-//   console.log(comment)
-//   post.comments.push(comment._id)
-//   await post.save();
-
-//   res.render('back', {footer: true});
-// });
 
 
 router.get('/profilenew', isloggedin, async function(req, res) {
@@ -472,85 +448,6 @@ router.post("/upload", isloggedin, upload.single("image"), async function(req, r
     res.status(500).json({ error: "Internal Server Error" });
   }
 });
-
-
-// router.post("/upload", isloggedin, upload.single("image"), async function(req, res) {
-//   try {
-//     const user = await userModel.findOne({ username: req.session.passport.user });
-
-//     if (!user) {
-//       return res.status(404).json({ error: "User not found" });
-//     }
-
-//     if (!req.file) {
-//       return res.status(400).json({ error: "No image or video uploaded" });
-//     }
-
-//     console.log(req.body.type)
-//     if (!["post", "story","reel"].includes(req.body.type)) {
-//       return res.status(400).json({ error: "Invalid type" });
-//     }
-
-    
-//     if (req.body.type === "post") {
-//       const result = await cloudinary.uploader.upload(req.file.path);
-//       const post = await postModel.create({
-//         picture: result.secure_url,
-//         user: user._id,
-//         caption: req.body.caption
-//       });
-//       console.log("New post created:", post);
-//       user.posts.push(post._id);
-//     } else if (req.body.type === "story") {
-//       const result = await cloudinary.uploader.upload(req.file.path);
-//       const story = await storyModel.create({
-//         picture: result.secure_url,
-//         user: user._id
-//       });
-//       console.log("New story created:", story);
-//       user.story.push(story._id);
-//     }else if (req.body.type === "reel") {
-//       const videoPath = req.file.path;
-//   fs.readFile(videoPath, (err, video) => {
-//     if (err) {
-//       return res.status(500).json({ error: 'Failed to read video file' });
-//     }
-
-//     imagekit.upload(
-//       {
-//         file: video,
-//         fileName: req.file.filename,
-//         folder: 'videos',
-//       },
-//       async (error, result) => {
-//         if (error) {
-//           return res.status(500).json({ error: 'Failed to upload video to ImageKit' });
-//         }
-
-//         // Save video metadata to MongoDB
-//         const newVideo = new videoModel({
-//           description: req.body.description,
-//           source: result.url,
-//         });
-
-//         try {
-//           await newVideo.save();
-//           res.status(200).json({ message: 'Video uploaded successfully', video: newVideo });
-//         } catch (dbError) {
-//           res.status(500).json({ error: 'Failed to save video to database' });
-//         }
-//       }
-//     );
-//   });
-//     }
-
-//     await user.save();
-//     res.redirect("/feed");
-//   } catch (error) {
-//     console.error("Error occurred:", error);
-//     res.status(500).json({ error: "Internal Server Error" });
-//   }
-// });
 
 
 

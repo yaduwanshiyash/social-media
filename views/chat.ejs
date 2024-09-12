@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat with <%= friend.username %></title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #121212;
+            color: #e0e0e0;
+            margin: 0;
+            padding: 0;
+        }
+
+        .chat-container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            width: 50vw;
+            margin: auto;
+        }
+
+        @media (max-width: 600px) {
+            .chat-container {
+                width: 100vw;
+            }
+        }
+
+        .chat-header {
+            background-color: #1f1f1f;
+            padding: 15px;
+            border-bottom: 1px solid #333;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .chat-header h2 {
+            margin: 0;
+        }
+
+        .chat-header .status {
+            font-size: 0.8em;
+            color: #00ff00; /* Green for online status */
+        }
+
+        .chat-messages {
+            flex: 1;
+            padding: 15px;
+            overflow-y: auto;
+            background-color: #121212;
+        }
+
+        .message {
+            padding: 10px;
+            border-radius: 10px;
+            margin-bottom: 10px;
+            max-width: 60%;
+            font-size: 1em;
+            width: fit-content;
+        }
+
+        /* Webkit browsers (Chrome, Safari) */
+.chat-messages::-webkit-scrollbar {
+    width: 12px; /* Width of the scrollbar */
+}
+
+.chat-messages::-webkit-scrollbar-track {
+    background: #1e1e1e; /* Track color */
+    border-radius: 10px; /* Rounded corners for the track */
+}
+
+.chat-messages::-webkit-scrollbar-thumb {
+    background: #888; /* Thumb color */
+    border-radius: 10px; /* Rounded corners for the thumb */
+}
+
+.chat-messages::-webkit-scrollbar-thumb:hover {
+    background: #666; /* Darker thumb color on hover */
+}
+
+        .message.sent {
+            background-color: #007bff;
+            color: #fff;
+            margin-left: auto;
+        }
+
+        .message.received {
+            background-color: #333;
+            color: #fff;
+        }
+
+        .status-indicator {
+            font-size: 0.8em;
+            color: #888;
+        }
+
+        .chat-input-container {
+            display: flex;
+            padding: 15px;
+            background-color: #1f1f1f;
+            border-top: 1px solid #333;
+        }
+
+        .chat-input-container input {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #333;
+            border-radius: 5px;
+            background-color: #121212;
+            color: #e0e0e0;
+            outline: none;
+        }
+
+        .chat-input-container button {
+            padding: 10px;
+            margin-left: 10px;
+            border: none;
+            border-radius: 5px;
+            background-color: #007bff;
+            color: #fff;
+            cursor: pointer;
+        }
+
+        .chat-input-container button:hover {
+            background-color: #0056b3;
+        }
+
+        .message-date {
+            text-align: center;
+            color: #aaa;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="chat-container">
+        <div class="chat-header">
+            <h2>Chat with <%= friend.username %> <span class="status" id="status">Ofline</span></h2>
+        </div>
+        <div class="chat-messages" id="chat-messages"></div>
+        <div class="chat-input-container">
+            <input type="text" id="message-input" placeholder="Type a message..." />
+            <button id="send-btn">Send</button>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+
+        const userId = '<%= user._id %>';
+        const friendId = '<%= friend._id %>';
+
+        socket.emit('userConnected', userId);
+
+        socket.emit('fetchMessages', {
+            sender: userId,
+            receiver: friendId
+        });
+
+        socket.on('loadMessages', messages => {
+            const chatMessages = document.getElementById('chat-messages');
+            chatMessages.innerHTML = '';
+            const groupedMessages = groupMessagesByDate(messages);
+            groupedMessages.forEach(group => {
+                const dateDiv = document.createElement('div');
+                dateDiv.className = 'message-date';
+                dateDiv.textContent = group.date;
+                chatMessages.appendChild(dateDiv);
+                group.messages.forEach(message => {
+                    const messageDiv = document.createElement('div');
+                    messageDiv.className = `message ${message.sender === userId ? 'sent' : 'received'}`;
+                    messageDiv.innerHTML = `${message.content} <span style="font-size: 0.7em; color: #fff; display: block;">${new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>`;
+                    chatMessages.appendChild(messageDiv);
+                });
+            });
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        });
+
+        function groupMessagesByDate(messages) {
+            const groups = {};
+            messages.forEach(message => {
+                const date = new Date(message.timestamp).toLocaleDateString();
+                if (!groups[date]) {
+                    groups[date] = [];
+                }
+                groups[date].push(message);
+            });
+            return Object.keys(groups).map(date => ({ date, messages: groups[date] }));
+        }
+
+        document.getElementById('send-btn').addEventListener('click', () => {
+            const messageInput = document.getElementById('message-input');
+            const message = messageInput.value.trim();
+
+            if (message !== '') {
+                const messageData = {
+                    sender: userId,
+                    receiver: friendId,
+                    content: message,
+                    id: generateUniqueId()
+                };
+                socket.emit('sendMessage', messageData);
+                messageInput.value = '';
+            }
+        });
+
+        document.getElementById('message-input').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                document.getElementById('send-btn').click();
+            }
+        });
+
+        socket.on('receiveMessage', message => {
+            const chatMessages = document.getElementById('chat-messages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${message.sender === userId ? 'sent' : 'received'}`;
+            messageDiv.innerHTML = `${message.content} <span style="font-size: 0.7em; color: #fff; display: block;">${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>`;
+            chatMessages.appendChild(messageDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        });
+
+        socket.on('messageRead', data => {
+            const { userId, messageId } = data;
+            const messageDivs = document.querySelectorAll(`#chat-messages .message`);
+            messageDivs.forEach(div => {
+                if (div.dataset.messageId === messageId && userId !== userId) {
+                    div.classList.add('read');
+                }
+            });
+        });
+
+        socket.on('userOnline', data => {
+            if (data.userId === friendId) {
+                document.getElementById('status').innerText = 'Online';
+                document.getElementById('status').style.color = '#00ff00';
+            }
+        });
+
+        socket.on('userOffline', data => {
+            if (data.userId === friendId) {
+                document.getElementById('status').innerText = 'Offline';
+                document.getElementById('status').style.color = '#ff0000';
+            }
+        });
+
+        function generateUniqueId() {
+            return Math.random().toString(36).substr(2, 9);
+        }
+    </script>
+</body>
+</html>
