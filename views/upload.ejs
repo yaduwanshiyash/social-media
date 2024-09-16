@@ -7,7 +7,9 @@
     </div>
     <div class="flex flex-col items-center gap-2 mt-20">
       <div class="image w-[25vw] h-[25vw] md:w-[10vw] md:h-[10vw] rounded-full border-2 border-zinc-800 flex items-center justify-center">
-        <i class="text-3xl font-light ri-image-line"></i>
+        <!-- Image preview will be inserted here -->
+        <img id="preview" class="hidden w-full h-full object-cover rounded-full" />
+        <i id="imageIcon" class="text-3xl font-light ri-image-line"></i>
       </div>
       <button id="selectpic" class="text-blue-500 capitalize">select picture</button>
     </div>
@@ -17,7 +19,7 @@
       <button class="opacity-30 btn border-b-2 border-zinc-900 pb-2">reel</button>
     </div>
     <form id="uploadform" action="/upload" class="w-full px-6 py-3 mt-10" enctype="multipart/form-data" method="post">
-      <input hidden type="file" name="image">
+      <input hidden type="file" name="image" id="fileInput">
       <input hidden type="radio" name="type" value="post" checked>
       <textarea name="caption" class="px-2 py-1 w-full bg-white dark:bg-zinc-900 border-2 h-20 border-zinc-800 resize-none rounded-md outline-none"
         placeholder="Write a caption..."></textarea>
@@ -26,18 +28,36 @@
   </div>
 
   <script>
+    // Event listener for the 'select picture' button
     document.querySelector("#selectpic")
       .addEventListener("click", function () {
-        document.querySelector("#uploadform input").click();
+        document.querySelector("#fileInput").click();
       });
 
-      function handleSwitchTypePost(){
-        document.querySelector(".btngrp")
-        .addEventListener("click", function(ev){
-          if(ev.target.classList.contains('btn')){
-            if(!ev.target.classList.contains("selected")){
+    // Event listener for image input change to display the preview
+    document.querySelector("#fileInput").addEventListener("change", function () {
+      const file = this.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = function (e) {
+          // Hide the icon and show the image preview
+          document.querySelector("#imageIcon").classList.add("hidden");
+          const preview = document.querySelector("#preview");
+          preview.src = e.target.result;
+          preview.classList.remove("hidden");
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+
+    // Function to switch between Post, Story, and Reel
+    function handleSwitchTypePost() {
+      document.querySelector(".btngrp")
+        .addEventListener("click", function (ev) {
+          if (ev.target.classList.contains('btn')) {
+            if (!ev.target.classList.contains("selected")) {
               document.querySelector("#uploadform input[type='radio']")
-              .value = ev.target.textContent;
+                .value = ev.target.textContent;
 
               var selected = ev.target.parentNode.querySelector(".selected");
               selected.classList.remove('selected', 'border-zinc-400');
@@ -47,8 +67,8 @@
               ev.target.classList.remove('opacity-30', 'border-zinc-900');
             }
           }
-        })
-      }
-      handleSwitchTypePost()
+        });
+    }
+    handleSwitchTypePost();
   </script>
-  <% include ./partials/footer.ejs %>
+<% include ./partials/footer.ejs %>

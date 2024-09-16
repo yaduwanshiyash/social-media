@@ -38,7 +38,7 @@
                     <div class="flex gap-2 justify-between  items-center  hover:bg-zinc-600 rounded-xl p-3">
                      <div class="flex gap-2  items-center">
                         <div class="w-9 h-9 rounded-full overflow-hidden mr-2">
-                            <img src="<%= comment.user.profileImage %>" alt="Post Image" class="w-full rounded-full h-full ">
+                            <img src="<%= comment.user.profileImage %>" loading="lazy" alt="Post Image" class="w-full rounded-full h-full ">
                         </div>
                         <div>
                             <a href="/userprofile/<%= comment.user.username %>"><p class="text-lg outline-none font-semibold text-white"><%= comment.user.username %></p></a>

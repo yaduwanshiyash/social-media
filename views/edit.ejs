@@ -7,7 +7,7 @@
     </div>
     <div class="flex flex-col items-center gap-2 mt-20">
       <div class="image w-20 h-20 bg-sky-100 rounded-full overflow-hidden">
-        <img class=" h-full w-full object-cover" src="<%= user.profileImage %>" alt="" srcset="">
+        <img id="profilePreview" class="h-full w-full object-cover" src="<%= user.profileImage %>" alt="" srcset="">
       </div>
       <button id="editbtn" class="text-blue-500 capitalize pointer">edit picture</button>
     </div>
@@ -25,10 +25,22 @@
   </div>
 
   <script>
-      document.querySelector('#editbtn')
-      .addEventListener('click',function(){
-        document.querySelector("#imageinput").click()
-      })
-      
+      // Handle the "edit picture" button click
+      document.querySelector('#editbtn').addEventListener('click', function() {
+        document.querySelector("#imageinput").click(); // Trigger file input click
+      });
+
+      // Preview selected profile picture
+      document.querySelector("#imageinput").addEventListener("change", function() {
+        const file = this.files[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onload = function(e) {
+            // Update the image source with the new image preview
+            document.querySelector("#profilePreview").src = e.target.result;
+          };
+          reader.readAsDataURL(file); // Read the selected image as a DataURL
+        }
+      });
   </script>
 <% include ./partials/footer.ejs %>

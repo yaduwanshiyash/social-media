@@ -11,13 +11,16 @@ const videoModel = require("./video")
 const passport = require('passport')
 const localStrategy = require("passport-local")
 const upload = require("./multer")
-const fs = require('fs')
-const path = require('path');
 const utils = require("../utils/utils");
 const cloudinary = require('../utils/cloudnary');
 const imagekit = require('../utils/imagekit');
 const sharp = require('sharp');
+const ffmpeg = require('fluent-ffmpeg');
+const fs = require('fs');
+const path = require('path');
 const gm = require('gm').subClass({ imageMagick: true });
+const redisClient = require('../utils/redis');
+
 
 
 
@@ -81,59 +84,199 @@ router.get('/chat/:friendId', isloggedin, async (req, res) => {
 });
 
 
-
-
-
-router.get("/reel", isloggedin, async function(req, res) {
+// Example route: /reel
+router.get('/reel', isloggedin, async (req, res) => {
   try {
+    // Get the logged-in user
     const user = await userModel.findOne({ username: req.session.passport.user });
-
     if (!user) {
-      return res.status(404).send("User not found");
+      return res.status(404).send('User not found');
     }
 
-    const reels = await videoModel.find().populate('user');
+    // Cache key to store and retrieve data
+    const cacheKey = `reels:${user._id}`;
 
-    res.render("reel", { footer: true, reels, user });
+    // Try to get data from Redis
+    const cachedReels = await redisClient.get(cacheKey);
+
+    if (cachedReels) {
+      // If cached data is found, parse it and send it to the client
+      console.log('Cache hit');
+      const reels = JSON.parse(cachedReels);
+      return res.render('reel', { footer: false, reels, user });
+    } else {
+      // If no cache, fetch from MongoDB
+      const reels = await videoModel.find().populate('user').lean();
+
+      // Store fetched data in Redis for 60 seconds
+      await redisClient.setEx(cacheKey, 600, JSON.stringify(reels));
+
+      // Send the response to the client
+      res.render('reel', { footer: false, reels, user });
+    }
   } catch (error) {
-    console.error("Error occurred while fetching feed:", error);
-    res.status(500).send("Internal Server Error");
+    console.error('Error occurred while fetching reels:', error);
+    res.status(500).send('Internal Server Error');
   }
 });
 
+// router.get("/reel", isloggedin, async function(req, res) {
+//   try {
+//     const user = await userModel.findOne({ username: req.session.passport.user });
 
-router.get("/feed", isloggedin, async function(req, res) {
+//     if (!user) {
+//       return res.status(404).send("User not found");
+//     }
+
+//     const reels = await videoModel.find().populate('user');
+
+//     res.render("reel", { footer: true, reels, user });
+//   } catch (error) {
+//     console.error("Error occurred while fetching feed:", error);
+//     res.status(500).send("Internal Server Error");
+//   }
+// });
+
+
+
+// old code
+
+router.get("/feed", isloggedin, async function (req, res) {
   try {
     const user = await userModel.findOne({ username: req.session.passport.user });
+    if (!user) return res.status(404).send("User not found");
 
-    if (!user) {
-      return res.status(404).send("User not found");
+    const cacheKey = `feed:${user._id}`;
+    const limit = 10; // Items per page
+    const page = req.query.page || 1;
+    const skip = (page - 1) * limit;
+
+    // Try to get data from Redis
+    let cachedfeed;
+    try {
+      cachedfeed = await redisClient.get(cacheKey);
+    } catch (redisError) {
+      console.error("Redis error:", redisError);
     }
 
-    const posts = await postModel.find().populate('user').lean();
-    const reels = await videoModel.find().populate('user').lean();
-    const stories = await storyModel.find({ user: { $ne: user._id } }).populate('user');
+    let stories;
+    if (cachedfeed) {
+      // If cached data is found, parse it and send it to the client
+      const combinedPostsAndReels = JSON.parse(cachedfeed);
 
-    const uniqueStories = {};
-    const filteredStories = stories.filter(story => {
-      if (!uniqueStories[story.user._id]) {
-        uniqueStories[story.user._id] = true;
-        return true;
+      // Fetch stories (since they are not cached)
+      stories = await storyModel
+        .find({ user: { $ne: user._id } })
+        .populate("user", "username profileImage")
+        .lean();
+
+      const uniqueStories = new Set();
+      const filteredStories = stories.filter((story) => {
+        if (!uniqueStories.has(story.user._id)) {
+          uniqueStories.add(story.user._id);
+          return true;
+        }
+        return false;
+      });
+
+      return res.render("feed", {
+        footer: true,
+        postsAndReels: combinedPostsAndReels,
+        user,
+        stories: filteredStories,
+      });
+    } else {
+      // If no cache, fetch from MongoDB
+      const [posts, reels] = await Promise.all([
+        postModel
+          .find()
+          .populate("user", "username profileImage")
+          .sort({ createdAt: -1 })
+          .skip(skip)
+          .limit(limit)
+          .lean(),
+        videoModel
+          .find()
+          .populate("user", "username profileImage")
+          .sort({ createdAt: -1 })
+          .skip(skip)
+          .limit(limit)
+          .lean(),
+      ]);
+
+      stories = await storyModel
+        .find({ user: { $ne: user._id } })
+        .populate("user", "username profileImage")
+        .lean();
+
+      const uniqueStories = new Set();
+      const filteredStories = stories.filter((story) => {
+        if (!uniqueStories.has(story.user._id)) {
+          uniqueStories.add(story.user._id);
+          return true;
+        }
+        return false;
+      });
+
+      const combinedPostsAndReels = [...posts, ...reels].sort(
+        (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
+      );
+
+      // Store fetched data in Redis for 10 minutes
+      try {
+        await redisClient.setEx(cacheKey, 600, JSON.stringify(combinedPostsAndReels));
+      } catch (redisError) {
+        console.error("Redis error:", redisError);
       }
-      return false;
-    });
 
-    // Combine and sort posts and reels by creation date
-    const combinedPostsAndReels = [...posts, ...reels].sort((a, b) => {
-      return new Date(b.createdAt) - new Date(a.createdAt);
-    });
-
-    res.render("feed", { footer: true, postsAndReels: combinedPostsAndReels, user, stories: filteredStories });
+      // Send the response to the client
+      return res.render("feed", {
+        footer: true,
+        postsAndReels: combinedPostsAndReels,
+        user,
+        stories: filteredStories,
+      });
+    }
   } catch (error) {
     console.error("Error occurred while fetching feed:", error);
-    res.status(500).send("Internal Server Error");
+    return res.status(500).send("Internal Server Error");
   }
 });
+
+
+
+// router.get("/feed", isloggedin, async function(req, res) {
+//   try {
+//     const user = await userModel.findOne({ username: req.session.passport.user });
+
+//     if (!user) {
+//       return res.status(404).send("User not found");
+//     }
+
+//     const posts = await postModel.find().populate('user').lean();
+//     const reels = await videoModel.find().populate('user').lean();
+//     const stories = await storyModel.find({ user: { $ne: user._id } }).populate('user');
+
+//     const uniqueStories = {};
+//     const filteredStories = stories.filter(story => {
+//       if (!uniqueStories[story.user._id]) {
+//         uniqueStories[story.user._id] = true;
+//         return true;
+//       }
+//       return false;
+//     });
+
+//     // Combine and sort posts and reels by creation date
+//     const combinedPostsAndReels = [...posts, ...reels].sort((a, b) => {
+//       return new Date(b.createdAt) - new Date(a.createdAt);
+//     });
+
+//     res.render("feed", { footer: true, postsAndReels: combinedPostsAndReels, user, stories: filteredStories });
+//   } catch (error) {
+//     console.error("Error occurred while fetching feed:", error);
+//     res.status(500).send("Internal Server Error");
+//   }
+// });
 
 router.get("/story/:number", isloggedin, async function (req, res) {
   try {
@@ -344,23 +487,71 @@ router.get('/logout', function(req, res, next){
   });
 });
 
-router.post("/update",upload.single('image'), async function(req,res,next){
-  const user = await userModel.findOneAndUpdate({username: req.session.passport.user},{username: req.body.username,name: req.body.name,bio: req.body.bio},{new: true})
-  if(req.file){
-    const result = await cloudinary.uploader.upload(req.file.path);
-    user.profileImage = result.secure_url
+// router.post("/update",upload.single('image'), async function(req,res,next){
+//   const user = await userModel.findOneAndUpdate({username: req.session.passport.user},{username: req.body.username,name: req.body.name,bio: req.body.bio},{new: true})
+//   if(req.file){
+//     const result = await cloudinary.uploader.upload(req.file.path);
+//     user.profileImage = result.secure_url
+//   }
+//   await user.save();
+
+//   req.logIn(user,function(err){
+//     if(err) throw err;
+//     res.redirect("/profile")
+//   })
+
+// })
+
+
+router.post("/update", upload.single('image'), async function(req, res, next) {
+  try {
+    // Find and update the user information
+    const user = await userModel.findOneAndUpdate(
+      { username: req.session.passport.user },
+      { username: req.body.username, name: req.body.name, bio: req.body.bio },
+      { new: true }
+    );
+
+    if (req.file) {
+      // Define the path for the compressed and converted WebP image
+      const compressedImagePath = path.join(uploadsDir, `compressed_${req.file.filename}.webp`);
+
+      // Compress and convert the image to WebP format using sharp
+      await sharp(req.file.path)
+        .resize({ width: 500 })  // Resize the image to 1080px width
+        .webp({ quality: 50 })    // Compress and convert to WebP format with 85% quality
+        .toFile(compressedImagePath);  // Save the WebP image
+
+      // Upload the compressed WebP image to Cloudinary
+      const result = await cloudinary.uploader.upload(compressedImagePath);
+
+      // Set the profile image URL to the uploaded image's secure URL
+      user.profileImage = result.secure_url;
+
+      // Remove the compressed WebP file from the server after upload
+      await fs.promises.unlink(compressedImagePath);
+    }
+
+    // Save the updated user information
+    await user.save();
+
+    // Re-login the user and redirect to the profile page
+    req.logIn(user, function(err) {
+      if (err) throw err;
+      res.redirect("/profile");
+    });
+  } catch (error) {
+    console.error("Error updating profile:", error);
+    next(error);  // Pass the error to the error handler
   }
-  await user.save();
+});
 
-  req.logIn(user,function(err){
-    if(err) throw err;
-    res.redirect("/profile")
-  })
+const uploadsDir = path.resolve(__dirname, '../uploads');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir);
+}
 
-})
-
-
-router.post("/upload", isloggedin, upload.single("image"), async function(req, res) {
+router.post("/upload", isloggedin, upload.single("image"), async function (req, res) {
   try {
     const user = await userModel.findOne({ username: req.session.passport.user });
 
@@ -373,19 +564,28 @@ router.post("/upload", isloggedin, upload.single("image"), async function(req, r
     }
 
     const fileType = req.file.mimetype;
-    const validImageTypes = ["image/jpeg", "image/png", "image/gif"];
+    const validImageTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
     const validVideoTypes = ["video/mp4", "video/mpeg", "video/ogg"];
 
     if (!["post", "story", "reel"].includes(req.body.type)) {
       return res.status(400).json({ error: "Invalid type" });
     }
 
+    // Handle post or story (image compression)
     if (req.body.type === "post" || req.body.type === "story") {
       if (!validImageTypes.includes(fileType)) {
         return res.status(400).json({ error: "Invalid file type for post or story. Only images are allowed." });
       }
 
-      const result = await cloudinary.uploader.upload(req.file.path);
+      // Compress and resize image using sharp
+      const compressedImagePath = path.join(uploadsDir, `compressed_${req.file.filename}.webp`);
+      await sharp(req.file.path)
+        .resize({ width: 1080 })  // Resize image to 1080px width
+        .webp({ quality: 85 })  // Compress to 85% quality and convert to webp format
+        .toFile(compressedImagePath);  // Save to the uploads directory
+
+      // Upload the compressed image to cloudinary
+      const result = await cloudinary.uploader.upload(compressedImagePath);
 
       if (req.body.type === "post") {
         const post = await postModel.create({
@@ -403,14 +603,32 @@ router.post("/upload", isloggedin, upload.single("image"), async function(req, r
         console.log("New story created:", story);
         user.stories.push(story._id);
       }
-    } else if (req.body.type === "reel") {
+
+      // Remove the compressed file after upload
+      await fs.promises.unlink(compressedImagePath);
+    }
+
+    // Handle reel (video compression)
+    else if (req.body.type === "reel") {
       if (!validVideoTypes.includes(fileType)) {
         return res.status(400).json({ error: "Invalid file type for reel. Only videos are allowed." });
       }
 
-      const videoPath = req.file.path;
-      const video = await fs.promises.readFile(videoPath);
+      const compressedVideoPath = path.join(uploadsDir, `compressed_${req.file.filename}`);
 
+      // Compress video using fluent-ffmpeg
+      await new Promise((resolve, reject) => {
+        ffmpeg(req.file.path)
+          .output(compressedVideoPath)
+          .size('720x?')  // Resize video to 720px width (HD)
+          .videoBitrate('1000k')  // Set video bitrate to 1000k (1Mbps)
+          .on('end', resolve)
+          .on('error', reject)
+          .run();
+      });
+
+      // Upload compressed video to ImageKit or Cloudinary
+      const video = await fs.promises.readFile(compressedVideoPath);
       const result = await new Promise((resolve, reject) => {
         imagekit.upload(
           {
@@ -438,7 +656,9 @@ router.post("/upload", isloggedin, upload.single("image"), async function(req, r
       user.videos.push(newVideo._id);
       console.log("New reel created:", newVideo);
 
-      await fs.promises.unlink(videoPath);
+      // Remove original and compressed files after upload
+      await fs.promises.unlink(req.file.path);
+      await fs.promises.unlink(compressedVideoPath);
     }
 
     await user.save();
@@ -448,6 +668,96 @@ router.post("/upload", isloggedin, upload.single("image"), async function(req, r
     res.status(500).json({ error: "Internal Server Error" });
   }
 });
+
+
+// router.post("/upload", isloggedin, upload.single("image"), async function(req, res) {
+//   try {
+//     const user = await userModel.findOne({ username: req.session.passport.user });
+
+//     if (!user) {
+//       return res.status(404).json({ error: "User not found" });
+//     }
+
+//     if (!req.file) {
+//       return res.status(400).json({ error: "No image or video uploaded" });
+//     }
+
+//     const fileType = req.file.mimetype;
+//     const validImageTypes = ["image/jpeg", "image/png", "image/gif"];
+//     const validVideoTypes = ["video/mp4", "video/mpeg", "video/ogg"];
+
+//     if (!["post", "story", "reel"].includes(req.body.type)) {
+//       return res.status(400).json({ error: "Invalid type" });
+//     }
+
+//     if (req.body.type === "post" || req.body.type === "story") {
+//       if (!validImageTypes.includes(fileType)) {
+//         return res.status(400).json({ error: "Invalid file type for post or story. Only images are allowed." });
+//       }
+
+//       const result = await cloudinary.uploader.upload(req.file.path);
+
+//       if (req.body.type === "post") {
+//         const post = await postModel.create({
+//           picture: result.secure_url,
+//           user: user._id,
+//           caption: req.body.caption
+//         });
+//         console.log("New post created:", post);
+//         user.posts.push(post._id);
+//       } else if (req.body.type === "story") {
+//         const story = await storyModel.create({
+//           picture: result.secure_url,
+//           user: user._id
+//         });
+//         console.log("New story created:", story);
+//         user.stories.push(story._id);
+//       }
+//     } else if (req.body.type === "reel") {
+//       if (!validVideoTypes.includes(fileType)) {
+//         return res.status(400).json({ error: "Invalid file type for reel. Only videos are allowed." });
+//       }
+
+//       const videoPath = req.file.path;
+//       const video = await fs.promises.readFile(videoPath);
+
+//       const result = await new Promise((resolve, reject) => {
+//         imagekit.upload(
+//           {
+//             file: video,
+//             fileName: req.file.filename,
+//             folder: 'videos',
+//           },
+//           (error, result) => {
+//             if (error) {
+//               reject(new Error('Failed to upload video to ImageKit'));
+//             } else {
+//               resolve(result);
+//             }
+//           }
+//         );
+//       });
+
+//       const newVideo = new videoModel({
+//         caption: req.body.caption,
+//         source: result.url,
+//         user: user._id
+//       });
+
+//       await newVideo.save();
+//       user.videos.push(newVideo._id);
+//       console.log("New reel created:", newVideo);
+
+//       await fs.promises.unlink(videoPath);
+//     }
+
+//     await user.save();
+//     res.redirect("/feed");
+//   } catch (error) {
+//     console.error("Error occurred:", error);
+//     res.status(500).json({ error: "Internal Server Error" });
+//   }
+// });
 
 
 

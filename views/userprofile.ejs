@@ -52,14 +52,14 @@
           <div class="post mt-10 w-full min-h-[50vh]">
             <div class="title px-4 flex items-center gap-2">
               <div class="w-[8vw] h-[8vw] md:w-[3vw] md:h-[3vw] bg-sky-100 rounded-full overflow-hidden">
-                <img class=" w-full h-full object-cover" src="<%= other.profileImage %>" alt="">
+                <img class=" w-full h-full object-cover" src="<%= other.profileImage %>" loading="lazy" alt="">
               </div>
               <h4 class="text-sm"><%= other.username %></h4>
               <h6 class="text-xs opacity-80 dark:opacity-30"><%= post.date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) %>
               </h6>
             </div>
             <div class="w-full h-60 mt-4 bg-sky-100">
-              <img data-id="<%= post._id %>" class="postimg h-full w-full object-cover object-center" src="<%= post.picture%>" alt="">
+              <img data-id="<%= post._id %>" class="postimg h-full w-full object-cover object-center" src="<%= post.picture%>" loading="lazy" alt="">
             </div>
             <div class="options w-full px-4 flex justify-between items-center text-[1.4rem]">
               <div class="flex gap-3 mt-2">
