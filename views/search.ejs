@@ -1,44 +1,69 @@
 <% include ./partials/header.ejs %>
-  <div class="w-full min-h-screen bg-white md:w-[40vw] md:mx-auto dark:bg-zinc-900 text-zinc-950 dark:text-white px-4 py-5">
-    <div class="border-2 border-zinc-800 flex items-center justify-between px-2 py-1 rounded-md">
-        <i class="text-white ri-search-line"></i>
-        <input id="inputusername" class="ml-1 w-full bg-white dark:bg-zinc-900 text-zinc-950 dark:text-white outline-none" type="text" placeholder="search username">
+<div class="w-full min-h-screen bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white">
+  <div class="max-w-4xl mx-auto px-4 py-8">
+    <h1 class="text-3xl font-bold mb-8 text-center">Find Users</h1>
+    
+    <div class="relative mb-8">
+      <input id="inputusername" class="w-full bg-gray-100 dark:bg-zinc-800 text-zinc-900 dark:text-white outline-none border-none rounded-lg px-5 py-3 pl-12 text-lg focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-shadow" type="text" placeholder="Search by username">
+      <i class="absolute left-4 top-1/2 transform -translate-y-1/2 text-zinc-400 ri-search-line text-xl"></i>
     </div>
-    <div class="users">
+    
+    <div id="users" class="space-y-4">
+      <% allUsers.forEach(function(userItem) { %>
+        <a href="/userprofile/<%= userItem.username %>" class="user-item block hover:bg-gray-50 dark:hover:bg-zinc-800 transition-colors duration-200 rounded-lg overflow-hidden">
+          <div class="flex items-center p-4">
+            <div class="w-16 h-16 rounded-full overflow-hidden mr-4 flex-shrink-0">
+              <img src="<%= userItem.profileImage %>" alt="<%= userItem.username %>" class="w-full h-full object-cover">
+            </div>
+            <div class="flex-grow">
+              <h3 class="font-semibold text-lg mb-1"><%= userItem.username %></h3>
+              <p class="text-sm text-zinc-600 dark:text-zinc-400"><%= userItem.name %></p>
+              <p class="text-sm text-zinc-500 dark:text-zinc-500"><%= userItem.email %></p>
+            </div>
+            <div class="text-blue-500 dark:text-blue-400">
+              <i class="ri-arrow-right-line text-xl"></i>
+            </div>
+          </div>            
+        </a>
+      <% }); %>
+    </div>
 
-
+    <div id="no-results" class="hidden text-center text-zinc-500 dark:text-zinc-400 mt-8 text-lg">
+      No users found. Try a different search term.
     </div>
   </div>
+</div>
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/1.6.2/axios.min.js" integrity="sha512-b94Z6431JyXY14iSXwgzeZurHHRNkLt9d6bAHt7BZT38eqV+GyngIi/tVye4jBKPYQ2lBdRs0glww4fmpuLRwA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-  <script>
-    const inp = document.querySelector("#inputusername")
-    let clutter = "";
-    inp.addEventListener("input",function(){
-        var typed = this.value;
-        if(typed.length > 0){
-            axios.get(`/username/${typed}`)
-        .then(function(data){
-            clutter = ""
-            data.data.forEach(function(elem){
-                clutter += ` <a href="/userprofile/${elem.username}" class="outline-none">
-            <div class="text-white flex items-center p-3 rounded-xl bg-zinc-300 dark:bg-zinc-800 text-zinc-950 dark:text-white gap-2 mt-5">
-                <div class="image w-[11vw] h-[11vw] md:w-[4vw]  md:h-[4vw] object-cover object-center rounded-full overflow-hidden">
-                    <img src="${elem.profileImage}" alt="">
-                </div>
-                <div class="text">
-                    <h3>${elem.username}</h3>
-                    <h4 class="text-xs opacity-80 dark:opacity-30  leading-none">${elem.name}</h4>
-                    <h4 class="text-xs opacity-80 dark:opacity-30  leading-none">${elem.email}</h4>
-                </div>
-            </div>            
-        </a>`
-            })
-            document.querySelector(".users").innerHTML = clutter;
-        })
-
-        }
+<script>
+  const inp = document.querySelector("#inputusername");
+  const userItems = document.querySelectorAll('.user-item');
+  const noResults = document.querySelector("#no-results");
+  let debounceTimer;
+  
+  inp.addEventListener("input", function() {
+    const typed = this.value.trim().toLowerCase();
+    clearTimeout(debounceTimer);
+    
+    if (typed.length > 0) {
+      debounceTimer = setTimeout(() => {
+        let matchFound = false;
+        userItems.forEach(item => {
+          const username = item.querySelector('h3').textContent.toLowerCase();
+          if (username.includes(typed)) {
+            item.style.display = 'block';
+            matchFound = true;
+          } else {
+            item.style.display = 'none';
+          }
+        });
         
-    })
-  </script>
-<% include ./partials/footer.ejs %>
+        noResults.classList.toggle('hidden', matchFound);
+      }, 300);
+    } else {
+      userItems.forEach(item => item.style.display = 'block');
+      noResults.classList.add('hidden');
+    }
+  });
+</script>
+
+<%- include('./partials/footer', {user: user}); %>

@@ -28,10 +28,18 @@
         <!-- Comments Section -->
         <div class="bg-zinc-700 rounded-md shadow-md p-6">
             <!-- Comment Form -->
-            <form action="/createcomment/<%= post._id %>" method="post" class="mb-6">
-                <input type="text" name="comment" placeholder="Add a comment..." class="w-full border border-gray-300 rounded-md px-4 py-2 focus:outline-none mb-5 focus:border-blue-500">
-                <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded-md ml-2 focus:outline-none focus:bg-blue-600">comment</button>
-            </form>
+            <% if (post.picture) { %>
+                <form action="/createcomment/<%= post._id %>" method="post" class="mb-6">
+                    <input type="text" name="comment" placeholder="Add a comment..." class="w-full border border-gray-300 rounded-md px-4 py-2 focus:outline-none mb-5 focus:border-blue-500">
+                    <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded-md ml-2 focus:outline-none focus:bg-blue-600">comment</button>
+                </form>
+            <% } else if (post.source) { %>
+                <form action="/commentreel/<%= post._id %>" method="post" class="mb-6">
+                    <input type="text" name="comment" placeholder="Add a comment..." class="w-full border border-gray-300 rounded-md px-4 py-2 focus:outline-none mb-5 focus:border-blue-500">
+                    <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded-md ml-2 focus:outline-none focus:bg-blue-600">comment</button>
+                </form>
+            <% } %>
+           
             <!-- Comments List -->
             <div class="space-y-4 ">
                 <% post.comments.forEach(function(comment) { %>

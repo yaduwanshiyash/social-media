@@ -1,21 +1,23 @@
 <% if(footer){ %>
 </div>
-    <div class="footer text-zinc-950 dark:text-white flex justify-between items-center w-full md:w-[40vw] md:mx-[29.5vw] md:h-[5vw] fixed bottom-0 z-[10] bg-white dark:bg-slate-900 px-10 py-3">
-        <a href="/feed"><i class="text-[1.4rem] ri-home-line"></i></a>
-        <a href="/search"><i class="text-[1.4rem] ri-search-line"></i></a>
-        <a href="/upload"><i class="text-[1.4rem] ri-add-box-line"></i></a>
-        <a href="/reel" class="block dark:hidden"><i class="text-[1.4rem] ri-movie-2-line "></i></a>
-        <a href="/reel" class=" hidden dark:block">
-          <div class="w-6 h-6  rounded-full overflow-hidden">
-            <img  class=" h-full w-full object-cover object-center" src="https://ik.imagekit.io/yashyadav/icons8-reels-50.png?updatedAt=1717705368926" alt="" srcset="">
+    <div class="footer text-zinc-950 dark:text-white flex items-center md:h-[100vh] md:w-[10vw] fixed z-[10] bg-gradient-to-b from-white via-white to-gray-100 dark:from-zinc-950 dark:via-zinc-900 dark:to-zinc-800 px-3 py-5 transition-all duration-300 ease-in-out">
+        <a href="/feed" class="flex flex-col md:mt-8 items-center hover:text-blue-500 dark:hover:text-blue-400 transition-colors duration-200"><i class="text-[1.8rem] md:text-[2rem] ri-home-line"></i><span class="text-sm mt-1 hidden md:inline">Home</span></a>
+        <a href="/search" class="flex flex-col md:mt-8 items-center hover:text-blue-500 dark:hover:text-blue-400 transition-colors duration-200"><i class="text-[1.8rem] md:text-[2rem] ri-search-line"></i><span class="text-sm mt-1 hidden md:inline">Search</span></a>
+        <a href="/upload" class="flex flex-col md:mt-8 items-center hover:text-blue-500 dark:hover:text-blue-400 transition-colors duration-200"><i class="text-[1.8rem] md:text-[2rem] ri-add-box-line"></i><span class="text-sm mt-1 hidden md:inline">Upload</span></a>
+        <a href="/reel" class="flex flex-col md:mt-8 items-center block dark:hidden hover:text-blue-500 dark:hover:text-blue-400 transition-colors duration-200"><i class="text-[1.8rem] md:text-[2rem] ri-movie-2-line"></i><span class="text-sm mt-1 hidden md:inline">Reels</span></a>
+        <a href="/reel" class="flex flex-col md:mt-8 items-center hidden dark:block hover:text-blue-500 dark:hover:text-blue-400 transition-colors duration-200">
+          <div class="w-6 h-6 rounded-full overflow-hidden">
+            <img class="h-full w-full object-cover object-center" src="https://ik.imagekit.io/yashyadav/icons8-reels-50.png?updatedAt=1717705368926" alt="" srcset="">
           </div>
+          <span class="text-sm mt-1 hidden items-center md:inline">Reels</span>
         </a>
-        <a href="/profile">
-          <div class="w-6 h-6 bg-zinc-300 rounded-full overflow-hidden">
-            <img  class=" h-full w-full object-cover object-center" src="<%= user.profileImage %>" alt="" srcset="">
+        <a href="/profile" class="flex flex-col md:mt-8 items-center hover:text-blue-500 dark:hover:text-blue-400 transition-colors duration-200">
+          <div class="w-6 h-6 md:w-10 md:h-10 bg-zinc-300 rounded-full overflow-hidden">
+            <img class="h-full w-full object-cover object-center" src="<%= user.profileImage %>" alt="" srcset="">
           </div>
+          <span class="text-sm mt-1 hidden md:inline">Profile</span>
         </a>
-      </div>
+    </div>
 <% } %>
 <script>
 
@@ -42,14 +44,29 @@ document.addEventListener("DOMContentLoaded", function () {
 });
 
   
-  document.addEventListener("DOMContentLoaded", function(event) { 
-      var scrollpos = localStorage.getItem('scrollpos');
-      if (scrollpos) window.scrollTo(0, scrollpos);
-  });
+document.addEventListener("DOMContentLoaded", function(event) { 
+    var scrollpos = localStorage.getItem('scrollpos');
+    if (scrollpos) window.scrollTo(0, scrollpos);
+});
 
-  window.onbeforeunload = function(e) {
-      localStorage.setItem('scrollpos', window.scrollY);
-  };
+window.onbeforeunload = function(e) {
+    localStorage.setItem('scrollpos', window.scrollY);
+};
+
+// Responsive footer
+function adjustFooter() {
+  const footer = document.querySelector('.footer');
+  if (window.innerWidth <= 768) {
+    footer.classList.remove('left-0', 'top-1/2', '-translate-y-1/2', 'flex-col');
+    footer.classList.add('bottom-0', 'w-full', 'flex-row', 'justify-around');
+  } else {
+    footer.classList.add('left-0', 'top-1/2', '-translate-y-1/2', 'flex-col');
+    footer.classList.remove('bottom-0', 'w-full', 'flex-row', 'justify-around');
+  }
+}
+
+window.addEventListener('resize', adjustFooter);
+adjustFooter(); // Call on initial load
 </script>
 
 </body>
