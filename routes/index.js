@@ -103,7 +103,7 @@ router.get('/reel', isloggedin, async (req, res) => {
       // If cached data is found, parse it and send it to the client
       console.log('Cache hit');
       const reels = JSON.parse(cachedReels);
-      return res.render('reel', { footer: false, reels, user });
+      return res.render('reel', { footer: true, reels, user });
     } else {
       // If no cache, fetch from MongoDB
       const reels = await videoModel.find().populate('user').lean();
@@ -112,11 +112,59 @@ router.get('/reel', isloggedin, async (req, res) => {
       await redisClient.setEx(cacheKey, 600, JSON.stringify(reels));
 
       // Send the response to the client
-      res.render('reel', { footer: false, reels, user });
+      res.render('reel', { footer: true, reels, user });
     }
   } catch (error) {
     console.error('Error occurred while fetching reels:', error);
     res.status(500).send('Internal Server Error');
+  }
+});
+
+
+router.get('/post/:id', isloggedin, async function(req, res) {
+  try {
+    const post = await postModel.findById(req.params.id)
+      .populate('user', 'username profileImage')
+      .populate({
+        path: 'comments',
+        populate: {
+          path: 'user',
+          select: 'username profileImage'
+        }
+      });
+    
+    if (!post) {
+      return res.status(404).json({ message: 'Post not found' });
+    }
+    
+    res.json(post);
+  } catch (error) {
+    console.error('Error fetching post:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+
+router.get('/video/:id', isloggedin, async function(req, res) {
+  try {
+    const post = await videoModel.findById(req.params.id)
+      .populate('user', 'username profileImage')
+      .populate({
+        path: 'comments',
+        populate: {
+          path: 'user',
+          select: 'username profileImage'
+        }
+      });
+    
+    if (!post) {
+      return res.status(404).json({ message: 'Post not found' });
+    }
+    
+    res.json(post);
+  } catch (error) {
+    console.error('Error fetching post:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
   }
 });
 
@@ -219,7 +267,7 @@ router.get("/feed", isloggedin, async function (req, res) {
       });
 
       const combinedPostsAndReels = [...posts, ...reels].sort(
-        (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
+        (a, b) => new Date(b.createdAt || b.publishedAt) - new Date(a.createdAt || a.publishedAt)
       );
 
       // Store fetched data in Redis for 10 minutes
@@ -359,7 +407,15 @@ router.get("/story/:id/:number", isloggedin, async function (req, res) {
 
 router.get('/userprofile/:username', isloggedin, async function(req, res) {
   const user = await userModel.findOne({username: req.session.passport.user})
-  const other = await userModel.findOne({username: req.params.username}).populate('posts')
+  const other = await userModel.findOne({username: req.params.username})
+  .populate("posts")
+  .populate({
+    path: "videos",
+    model: videoModel
+  })
+  .exec();
+  console.log(other)
+  
   if(other.username == user.username){
     res.redirect('/profile');
   }else{
@@ -398,9 +454,8 @@ router.get('/comment/:id', isloggedin, async function(req, res) {
 
 router.post('/createcomment/:id', isloggedin, async function(req, res) {
   try {
-    const user = await userModel.findOne({ username: req.session.passport.user }).populate("posts");
-    const post = await postModel.findOne({ _id: req.params.id });
-
+    const user = await userModel.findOne({ username: req.session.passport.user });
+    const post = await postModel.findOne({ _id: req.params.id }).populate('user');
 
     const comment = await commentModel.create({
       comment: req.body.comment,
@@ -408,15 +463,96 @@ router.post('/createcomment/:id', isloggedin, async function(req, res) {
       whichpost: req.params.id,
     });
 
-
     post.comments.push(comment._id);
     await post.save();
 
+    // Create notification for comment
+    if (user._id.toString() !== post.user._id.toString()) {
+      const notification = await notificationModel.create({
+        recipient: post.user._id,
+        sender: user._id,
+        type: 'comment',
+        content: comment._id,
+        contentModel: 'Comment',
+        message: `${user.username} commented on your post`
+      });
+
+      // Add notification to recipient's notifications array
+      await userModel.findByIdAndUpdate(post.user._id, {
+        $push: { notifications: notification._id }
+      });
+
+      console.log("Notification created:", notification);
+    }
+
     res.redirect('back');
   } catch (error) {
-    // Handle any errors
     console.error(error);
     res.status(500).send("Internal Server Error");
+  }
+});
+
+
+router.post('/commentreel/:id', isloggedin, async function(req, res) {
+  let session;
+  try {
+    session = await mongoose.startSession();
+    session.startTransaction();
+
+    const { id } = req.params;
+    const { comment } = req.body;
+
+    if (!comment || comment.trim() === '') {
+      return res.status(400).json({ error: 'Comment cannot be empty' });
+    }
+
+    const user = await userModel.findOne({ username: req.session.passport.user }).session(session);
+    if (!user) {
+      await session.abortTransaction();
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const video = await videoModel.findById(id).session(session);
+    if (!video) {
+      await session.abortTransaction();
+      return res.status(404).json({ error: 'Video not found' });
+    }
+
+    const newComment = new commentModel({
+      comment: comment.trim(),
+      user: user._id,
+      whichpost: id
+    });
+
+    await newComment.save({ session });
+
+    video.comments.push(newComment._id);
+    await video.save({ session });
+
+    // Create a notification for the video owner
+    if (video.user.toString() !== user._id.toString()) {
+      const notification = new notificationModel({
+        user: video.user,
+        notificationBy: user._id,
+        notificationType: 'comment',
+        notificationPost: id
+      });
+      await notification.save({ session });
+    }
+
+    await session.commitTransaction();
+    res.redirect('back');
+
+  } catch (error) {
+    if (session) {
+      await session.abortTransaction();
+    }
+    console.error('Error in commentreel:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  } finally {
+    if (session) {
+      session.endSession();
+    }
   }
 });
 
@@ -429,23 +565,61 @@ router.get('/profilenew', isloggedin, async function(req, res) {
 
   res.render('profilenew', {footer: true, user,posts});
 });
+
+
 router.get('/profile', isloggedin, async function(req, res) {
-  const user = await userModel.findOne({username: req.session.passport.user}).populate("posts")
+  try {
+    const user = await userModel.findOne({username: req.session.passport.user})
+      .populate("posts")
+      .populate({
+        path: "videos",
+        model: videoModel
+      })
+      .exec();
 
-  res.render('profile', {footer: true, user});
+    // console.log("User videos:", user.videos);
+    
+    if (!user) {
+      console.log("User not found");
+      return res.status(404).send("User not found");
+    }
+
+    res.render('profile', {footer: true, user});
+  } catch (error) {
+    console.error("Error fetching user profile:", error);
+    res.status(500).send("Error fetching profile");
+  }
 });
 
 
-
-router.get('/search', isloggedin ,async function(req, res) {
-  const user = await userModel.findOne({username: req.session.passport.user})
-  res.render('search', {footer: true,user});
+router.get('/search', isloggedin, async function(req, res) {
+  try {
+    const currentUser = await userModel.findOne({username: req.session.passport.user});
+    const allUsers = await userModel.find({_id: {$ne: currentUser._id}})
+      .select('username name email profileImage')
+      .limit(50)
+      .lean();
+    
+    res.render('search', {footer: true, user: currentUser, allUsers});
+  } catch (error) {
+    console.error('Error fetching users:', error);
+    res.status(500).send('An error occurred while fetching users');
+  }
 });
 
+// We'll keep this route for real-time search functionality
 router.get('/username/:username', async function(req, res) {
-    const regex = new RegExp(`^${req.params.username}`,'i')
+  try {
+    const regex = new RegExp(req.params.username, 'i');
     const users = await userModel.find({username: regex})
+      .select('username name email profileImage')
+      .limit(50)
+      .lean();
     res.json(users);
+  } catch (error) {
+    console.error('Error searching users:', error);
+    res.status(500).json({ error: 'An error occurred while searching users' });
+  }
 });
 
 router.get('/edit', isloggedin, async function(req, res) {
@@ -774,6 +948,7 @@ router.get("/like/story/:id", isloggedin, async function(req,res){
 
   await story.save();
 })
+
 router.get("/like/reel/:id", isloggedin, async function(req, res) {
   try {
     const user = await userModel.findOne({ username: req.session.passport.user });
@@ -802,6 +977,8 @@ router.get("/like/reel/:id", isloggedin, async function(req, res) {
     res.status(500).json({ error: "Internal Server Error" });
   }
 });
+
+
 router.get("/like/post/:id", isloggedin, async function(req, res) {
   try {
     const user = await userModel.findOne({ username: req.session.passport.user });
@@ -809,7 +986,7 @@ router.get("/like/post/:id", isloggedin, async function(req, res) {
       return res.status(404).json({ error: "User not found" });
     }
 
-    const post = await postModel.findOne({ _id: req.params.id });
+    const post = await postModel.findOne({ _id: req.params.id }).populate('user');
     if (!post) {
       return res.status(404).json({ error: "Post not found" });
     }
@@ -824,15 +1001,20 @@ router.get("/like/post/:id", isloggedin, async function(req, res) {
 
     if (user._id.toString() !== post.user._id.toString()) {
       const notification = await notificationModel.create({
+        recipient: post.user._id,
         sender: user._id,
-        content: req.params.id,
-        recipient: post.user._id
+        type: 'like',
+        content: post._id,
+        contentModel: 'Post',
+        message: `${user.username} liked your post`
+      });
+
+      // Add notification to recipient's notifications array
+      await userModel.findByIdAndUpdate(post.user._id, {
+        $push: { notifications: notification._id }
       });
 
       console.log("Notification created:", notification);
-
-      user.notifications.push(notification._id);
-      await user.save();
     }
 
     await post.save();
@@ -950,24 +1132,150 @@ router.get("/bookmark/:id", isloggedin, async function(req,res){
   res.json(newpost);
 })
 
-router.get('/notification', isloggedin, async function(req, res) {
+// Add this route to your existing routes file
+
+router.get('/notifications', isloggedin, async (req, res) => {
   try {
-    const user = await userModel.findOne({ username: req.session.passport.user })
-    .populate({
-      path: 'notifications',
-      populate: [
-        { path: 'sender' },
-        { path: 'content' }
-      ]
+    const page = parseInt(req.query.page) || 1;
+    const limit = 20; // Number of notifications per page
+    const skip = (page - 1) * limit;
+
+    // Fetch notifications with pagination
+    const rawNotifications = await notificationModel.find({ recipient: req.user._id })
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean();
+
+    // Collect all user IDs and content IDs
+    const userIds = new Set();
+    const postIds = new Set();
+    const commentIds = new Set();
+
+    rawNotifications.forEach(notification => {
+      userIds.add(notification.sender.toString());
+      userIds.add(notification.recipient.toString());
+      if (notification.contentModel === 'Post') {
+        postIds.add(notification.content.toString());
+      } else if (notification.contentModel === 'Comment') {
+        commentIds.add(notification.content.toString());
+      }
     });
 
-    console.log(user);
-    res.render('notify', { footer: true, user });
+    // Fetch users, posts, and comments in bulk
+    const [users, posts, comments] = await Promise.all([
+      userModel.find({ _id: { $in: Array.from(userIds) } }, 'username profileImage').lean(),
+      postModel.find({ _id: { $in: Array.from(postIds) } }).lean(),
+      commentModel.find({ _id: { $in: Array.from(commentIds) } }).lean()
+    ]);
+
+    // Create lookup objects
+    const userLookup = Object.fromEntries(users.map(user => [user._id.toString(), user]));
+    const postLookup = Object.fromEntries(posts.map(post => [post._id.toString(), post]));
+    const commentLookup = Object.fromEntries(comments.map(comment => [comment._id.toString(), comment]));
+
+    // Assemble notifications
+    const notifications = rawNotifications.map(notification => ({
+      ...notification,
+      sender: userLookup[notification.sender.toString()] || { username: 'Unknown User' },
+      recipient: userLookup[notification.recipient.toString()] || { username: 'Unknown User' },
+      content: notification.contentModel === 'Post' 
+        ? postLookup[notification.content.toString()]
+        : commentLookup[notification.content.toString()]
+    }));
+
+    // Count total notifications for pagination
+    const totalNotifications = await notificationModel.countDocuments({ recipient: req.user._id });
+
+    // console.log('Assembled notifications:', JSON.stringify(notifications, null, 2));
+
+    const unreadCount = await notificationModel.countDocuments({ 
+      recipient: req.user._id,
+      read: false
+    });
+    
+    res.json({
+      notifications: notifications,
+      unreadCount: unreadCount,
+      currentPage: page,
+      hasNextPage: notifications.length === limit
+    });
+
+    // res.render('notify', {
+    //   footer: true,
+    //   user: req.user,
+    //   notifications: notifications,
+    //   currentPage: page,
+    //   totalPages: Math.ceil(totalNotifications / limit),
+    //   hasNextPage: skip + notifications.length < totalNotifications
+    // });
   } catch (error) {
-    console.error("Error occurred while populating notifications:", error);
-    res.status(500).json({ error: "Internal Server Error" });
+    console.error("Error occurred while fetching notifications:", error);
+    res.status(500).render('error', { message: "An error occurred while fetching notifications" });
   }
 });
+
+router.get('/api/notifications', isloggedin, async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = 20; // Number of notifications per page
+    const skip = (page - 1) * limit;
+
+    // Fetch notifications with pagination
+    const notifications = await notificationModel.find({ recipient: req.user._id })
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .populate('sender', 'username profileImage')
+      .lean();
+
+    res.json({
+      notifications: notifications,
+      currentPage: page,
+      hasNextPage: notifications.length === limit
+    });
+  } catch (error) {
+    console.error("Error occurred while fetching notifications:", error);
+    res.status(500).json({ error: "An error occurred while fetching notifications" });
+  }
+});
+
+// Mark notification as read
+router.post('/notifications/:id/read', isloggedin, async (req, res) => {
+  try {
+    const notification = await notificationModel.findOneAndUpdate(
+      { _id: req.params.id, recipient: req.user._id },
+      { $set: { isRead: true } },
+      { new: true }
+    );
+
+    if (!notification) {
+      return res.status(404).json({ error: "Notification not found" });
+    }
+
+    res.json({ success: true, notification });
+  } catch (error) {
+    console.error("Error marking notification as read:", error);
+    res.status(500).json({ error: "An error occurred while updating the notification" });
+  }
+});
+
+// Delete a notification
+router.delete('/notifications/:id', isloggedin, async (req, res) => {
+  try {
+    const result = await notificationModel.findOneAndDelete({ _id: req.params.id, recipient: req.user._id });
+
+    if (!result) {
+      return res.status(404).json({ error: "Notification not found" });
+    }
+
+    res.json({ success: true, message: "Notification deleted successfully" });
+  } catch (error) {
+    console.error("Error deleting notification:", error);
+    res.status(500).json({ error: "An error occurred while deleting the notification" });
+  }
+});
+
 
 router.get('/followers/:username', isloggedin, async function(req, res) {
   const user = await userModel.findOne({ username: req.session.passport.user})

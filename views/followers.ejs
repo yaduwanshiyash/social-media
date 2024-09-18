@@ -1,29 +1,45 @@
 <% include ./partials/header.ejs %>
-<div class="md:w-[40vw] md:mx-auto">
-<div class="nav flex bg-white dark:bg-zinc-900 md:w-[40vw] md:mx-auto text-zinc-950 dark:text-white justify-between items-center px-4">
-    <button class="text-sm text-blue-500" onclick="window.history.back()"><i class="ri-arrow-left-s-line"></i> Back</button>
-    <h4><%= another.username %>'s followers</h4>
-    <div class="icons flex gap-5">
-      <i class="text-[1.4rem] ri-menu-line"></i>
+<div class="max-w-2xl mx-auto w-full px-4 sm:px-6 lg:px-8">
+  <div class="sticky top-0 z-10 bg-indigo-600 dark:bg-indigo-800 shadow-md">
+    <div class="flex justify-between items-center px-4 py-3">
+      <button class="text-white hover:text-indigo-200 transition-colors flex items-center" onclick="window.history.back()">
+        <i class="ri-arrow-left-s-line text-xl"></i>
+        <span class="ml-1 hidden sm:inline">Back</span>
+      </button>
+      <h1 class="text-base sm:text-lg font-semibold text-center flex-grow text-white truncate"><%= another.username %>'s followers</h1>
     </div>
   </div>
-<div class=" min-h-screen w-full bg-white dark:bg-zinc-900 text-zinc-950 dark:text-white px-2 py-5">
 
-    <% another.followers.forEach(function(elem){ %>
-        <a href="/userprofile/<%= elem.username %>" class="outline-none">
-            <div class=" bg-zinc-800 dark:bg-zinc-980 text-white dark:text-white rounded-md px-3 py-3 flex items-center gap-5 mt-5">
-                <div class="image w-[11vw] h-[11vw] md:w-[4vw] md:h-[4vw] rounded-full overflow-hidden">
-                    <img src="<%= elem.profileImage %>" alt="">
-                </div>
-                <div class="text">
-                    <h3><%= elem.username %></h3>
-                    <h4 class="text-xs opacity-30 leading-none"><%= elem.name %></h4>
-                    <h4 class="text-xs opacity-30 leading-none"><%= elem.email %></h4>
-                </div>
-            </div>            
-        </a>
-    <% }) %>
-</div>
+  <div class="bg-gray-50 dark:bg-zinc-900 min-h-screen p-2 sm:p-4">
+    <% if (another.followers.length === 0) { %>
+      <div class="flex flex-col items-center justify-center h-64">
+        <i class="ri-user-follow-line text-4xl sm:text-6xl text-indigo-300 dark:text-indigo-500 mb-4"></i>
+        <p class="text-center text-indigo-600 dark:text-indigo-400 text-sm sm:text-base">No followers yet.</p>
+        <p class="text-center text-gray-500 dark:text-gray-400 mt-2 text-xs sm:text-sm px-4">When someone follows <%= another.username %>, they'll appear here.</p>
+      </div>
+    <% } else { %>
+      <div class="space-y-3 sm:space-y-4">
+        <% another.followers.forEach(function(elem){ %>
+          <a href="/userprofile/<%= elem.username %>" class="block transition-all duration-300 ease-in-out transform hover:-translate-y-1">
+            <div class="bg-white dark:bg-zinc-800 rounded-lg p-3 sm:p-4 flex items-center space-x-3 sm:space-x-4 hover:shadow-lg transition-shadow border border-indigo-100 dark:border-indigo-900">
+              <div class="flex-shrink-0 relative">
+                <img src="<%= elem.profileImage %>" alt="<%= elem.username %>'s profile" class="w-12 h-12 sm:w-16 sm:h-16 rounded-full object-cover border-2 border-indigo-500">
+                <div class="absolute bottom-0 right-0 w-3 h-3 sm:w-4 sm:h-4 bg-emerald-500 rounded-full border-2 border-white dark:border-zinc-800"></div>
+              </div>
+              <div class="flex-grow min-w-0">
+                <h3 class="font-semibold text-base sm:text-lg text-indigo-600 dark:text-indigo-400 truncate"><%= elem.username %></h3>
+                <p class="text-xs sm:text-sm text-gray-700 dark:text-gray-300 truncate"><%= elem.name %></p>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1 truncate"><i class="ri-mail-line mr-1"></i><%= elem.email %></p>
+              </div>
+              <div class="flex-shrink-0 text-indigo-400 dark:text-indigo-500">
+                <i class="ri-arrow-right-s-line text-lg sm:text-xl"></i>
+              </div>
+            </div>
+          </a>
+        <% }) %>
+      </div>
+    <% } %>
+  </div>
 </div>
 
 <% include ./partials/footer.ejs %>
