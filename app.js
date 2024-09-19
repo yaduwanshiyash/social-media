@@ -8,19 +8,26 @@ const http = require('http');
 const socketIo = require('socket.io');
 const mongoose = require('mongoose');
 const passport = require('passport');
+const fs = require('fs'); 
+const imagekit = require('./utils/imagekit');
+const mime = require('mime-types'); 
 
 const indexRouter = require('./routes/index');
 const usersRouter = require('./routes/users');
 
 const app = express();
 const server = http.createServer(app);
-const io = socketIo(server);
+const io = require('socket.io')(server, {
+    maxHttpBufferSize: 1e8 // 100 MB
+});
 
 // MongoDB schema and model for messages
 const MessageSchema = new mongoose.Schema({
     sender: String,
     receiver: String,
     content: String,
+    type: String, // 'text', 'image', or 'file'
+    fileName: String,
     timestamp: { type: Date, default: Date.now }
 });
 const Message = mongoose.model('Message', MessageSchema);
@@ -29,6 +36,12 @@ const Message = mongoose.model('Message', MessageSchema);
 const onlineUsers = {};
 const users = {}; // To keep track of user connection and typing status
 let messages = []; // Store messages
+
+const uploadDir = path.join(__dirname, 'public', 'uploads');
+if (!fs.existsSync(uploadDir)){
+    fs.mkdirSync(uploadDir, { recursive: true });
+}
+
 
 // Socket.io logic
 io.on('connection', (socket) => {
@@ -40,6 +53,8 @@ io.on('connection', (socket) => {
         io.emit('userOnline', { userId }); // Notify all clients that the user is online
         console.log(`${userId} is online`);
     });
+
+ 
 
 
     // Handle typing status
@@ -64,9 +79,42 @@ io.on('connection', (socket) => {
 
     // Handle sending new messages
     socket.on('sendMessage', async (message) => {
-        const newMessage = new Message(message);
-        await newMessage.save();
-        io.emit('receiveMessage', message); // Emit to all clients
+        if (message.type === 'image' || message.type === 'video' || message.type === 'file') {
+            // Extract the base64 data
+            const base64Data = message.content.split(';base64,').pop();
+            
+            // Determine file extension
+            const fileExtension = mime.extension(message.fileType);
+            const fileName = `${Date.now()}.${fileExtension}`;
+
+            // Upload to ImageKit
+            imagekit.upload({
+                file: base64Data,
+                fileName: fileName,
+                folder: "/chat_uploads/",
+                useUniqueFileName: true,
+                tags: [message.type]
+            }, async function(error, result) {
+                if(error) {
+                    console.error('Error uploading to ImageKit:', error);
+                    return;
+                }
+
+                
+                // Update message content to ImageKit URL
+                message.content = result.url;
+                message.fileName = result.name;
+                
+                const newMessage = new Message(message);
+                await newMessage.save();
+                io.emit('receiveMessage', message); // Emit to all clients
+            });
+        } else {
+            // Text message
+            const newMessage = new Message(message);
+            await newMessage.save();
+            io.emit('receiveMessage', message); // Emit to all clients
+        }
     });
 
     // Handle fetching chat messages between two users
@@ -132,6 +180,11 @@ app.use(
         resave: false,
         saveUninitialized: false,
         secret: 'yourSecret',
+        rolling: true,
+  cookie: { 
+    secure: false,
+    maxAge: new Date(Date.now() + 2 * 60 * 60 * 1000)
+  }
     })
 );
 app.use(passport.initialize());
