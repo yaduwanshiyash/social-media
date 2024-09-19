@@ -20,11 +20,54 @@ const fs = require('fs');
 const path = require('path');
 const gm = require('gm').subClass({ imageMagick: true });
 const redisClient = require('../utils/redis');
+const GoogleStrategy = require('passport-google-oauth20').Strategy;
 
 
 
 
 passport.use(new localStrategy(userModel.authenticate()))
+
+// Configure Google Strategy
+passport.use(new GoogleStrategy({
+  clientID: process.env.GOOGLE_CLIENT_ID,
+  clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+  callbackURL: process.env.GOOGLE_CALLBACK_URL
+},
+async function(accessToken, refreshToken, profile, done) {
+  try {
+    // Check if user already exists in your database
+    let user = await userModel.findOne({ googleId: profile.id });
+    
+    if (!user) {
+      // If user doesn't exist, create a new user
+      user = new userModel({
+        googleId: profile.id,
+        username: profile.displayName,
+        email: profile.emails[0].value,
+        profileImage: profile.photos[0].value
+      });
+      await user.save();
+    }
+    
+    return done(null, user);
+  } catch (error) {
+    return done(error, null);
+  }
+}
+));
+
+// ... existing code ...
+
+// Google Auth Routes
+router.get('/auth/google',
+passport.authenticate('google', { scope: ['profile', 'email'] }));
+
+router.get('/auth/google/callback', 
+passport.authenticate('google', { failureRedirect: '/login' }),
+function(req, res) {
+  // Successful authentication, redirect to profile.
+  res.redirect('/profile');
+});
 
 router.get('/', function(req, res) {
   res.render('index', {footer: false});
@@ -970,6 +1013,24 @@ router.get("/like/reel/:id", isloggedin, async function(req, res) {
       reel.likes.splice(userIndex, 1);
     }
 
+    if (user._id.toString() !== reel.user._id.toString()) {
+      const notification = await notificationModel.create({
+        recipient: reel.user._id,
+        sender: user._id,
+        type: 'like',
+        content: reel._id,
+        contentModel: 'reel',
+        message: `${user.username} liked your reel`
+      });
+
+      // Add notification to recipient's notifications array
+      await userModel.findByIdAndUpdate(reel.user._id, {
+        $push: { notifications: notification._id }
+      });
+
+      // console.log("Notification created:", notification);
+    }
+    
     await reel.save();
     res.json(reel);
   } catch (error) {
@@ -1014,7 +1075,7 @@ router.get("/like/post/:id", isloggedin, async function(req, res) {
         $push: { notifications: notification._id }
       });
 
-      console.log("Notification created:", notification);
+      // console.log("Notification created:", notification);
     }
 
     await post.save();

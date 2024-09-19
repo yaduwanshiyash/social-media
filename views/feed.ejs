@@ -75,7 +75,7 @@
           <div class="options w-full px-4 flex justify-between items-center text-[1.4rem]">
             <div class="flex gap-3 mt-2">
               <% if (elem.picture) { %>
-                <i data-id="<%= elem._id %>" class="like <%= elem.likes.indexOf(user.id) === -1 ? 'ri-heart-3-line' : 'text-red-500 ri-heart-3-fill' %> hover:text-red-500 transition-colors duration-300"></i>
+                <i data-id="<%= elem._id %>" class="like <%= elem.likes && elem.likes.includes(user._id) === -1 ? 'ri-heart-3-line' : 'text-red-500 ri-heart-3-fill' %> hover:text-red-500 transition-colors duration-300"></i>
               <% } else if (elem.source) { %>
                 <i data-id="<%= elem._id %>" class="reel <%= elem.likes.indexOf(user.id) === -1 ? 'ri-heart-3-line' : 'text-red-500 ri-heart-3-fill' %> hover:text-red-500 transition-colors duration-300"></i>
               <% } %>
@@ -176,7 +176,7 @@ document.addEventListener('DOMContentLoaded', function() {
       notificationElement.innerHTML = `
         <div class="flex items-start justify-between">
           <div class="flex items-start">
-            <img src="${notification.sender.profileImage}" alt="${notification.sender.username}" class="w-10 h-10 rounded-full mr-3">
+            <img src="${notification.sender.profileImage}" alt="${notification.sender.username}" class="w-10 object-cover object-center h-10 rounded-full mr-3">
             <div>
               <p class="text-sm font-medium">${getNotificationMessage(notification)}</p>
               <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">${formatDate(notification.createdAt)}</p>

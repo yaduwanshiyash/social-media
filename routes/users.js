@@ -5,6 +5,7 @@ const plm = require("passport-local-mongoose")
 mongoose.connect(process.env.MONGO_URL).then(() => console.log('Connected!'));
 
 const userSchema = mongoose.Schema({
+  googleId: String,
   username:String,
   socketId: String,
   name: String,

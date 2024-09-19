@@ -24,7 +24,7 @@ const notificationSchema = mongoose.Schema({
   contentModel: {
     type: String,
     required: function() { return this.content != null },
-    enum: ['Post', 'Comment']
+    enum: ['Post', 'Comment','reel']
   },
   message: {
     type: String,

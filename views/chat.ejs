@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Chat with <%= friend.username %></title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+    <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -52,6 +54,7 @@
 
         .message {
             padding: 10px 15px;
+            overflow: hidden;
             border-radius: 18px;
             margin-bottom: 15px;
             max-width: fit-content;
@@ -61,7 +64,7 @@
         }
 
         .message.sent {
-            background-color: #0084ff;
+            background-color: #972ac9bb;
             color: #fff;
             margin-left: auto;
             border-bottom-right-radius: 4px;
@@ -75,7 +78,7 @@
 
         .message-time {
             font-size: 0.7em;
-            color: rgba(255, 255, 255, 0.7);
+            color: rgb(255, 255, 255);
             margin-top: 5px;
             text-align: right;
         }
@@ -114,7 +117,7 @@
 
         .message-date {
             text-align: center;
-            color: #888;
+            color: #fff;
             margin: 20px 0;
             font-size: 0.8em;
         }
@@ -140,6 +143,12 @@
             background: #555;
         }
 
+        .message video {
+        max-width: 500px;
+        max-height: 500px;
+        border-radius: 10px;
+    }
+
         @media (max-width: 600px) {
             .chat-container {
                 width: 100%;
@@ -157,6 +166,12 @@
         <div class="chat-messages" id="chat-messages"></div>
         <div class="chat-input-container">
             <input type="text" id="message-input" placeholder="Type a message..." />
+            <input type="file" id="file-input" style="display: none;" />
+    <button id="attach-btn">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
+        </svg>
+    </button>
             <button id="send-btn">
                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <line x1="22" y1="2" x2="11" y2="13"></line>
@@ -167,6 +182,8 @@
     </div>
 
     <script src="/socket.io/socket.io.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/compressorjs/1.1.1/compressor.min.js"></script>
+<script src="https://unpkg.com/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js"></script>
     <script>
         const socket = io();
 
@@ -180,27 +197,210 @@
             receiver: friendId
         });
 
-        socket.on('loadMessages', messages => {
-            const chatMessages = document.getElementById('chat-messages');
-            chatMessages.innerHTML = '';
-            const groupedMessages = groupMessagesByDate(messages);
-            groupedMessages.forEach(group => {
-                const dateDiv = document.createElement('div');
-                dateDiv.className = 'message-date';
-                dateDiv.textContent = formatDate(group.date);
-                chatMessages.appendChild(dateDiv);
-                group.messages.forEach(message => {
-                    const messageDiv = document.createElement('div');
-                    messageDiv.className = `message ${message.sender === userId ? 'sent' : 'received'}`;
+        document.getElementById('attach-btn').addEventListener('click', () => {
+        document.getElementById('file-input').click();
+    });
+
+
+    document.getElementById('file-input').addEventListener('change', handleFileUpload);
+
+
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+const MAX_IMAGE_SIZE = 1024; // 1024px
+const MAX_VIDEO_SIZE = 10 * 1024 * 1024; // 10MB
+
+async function handleFileUpload(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    if (file.size > MAX_FILE_SIZE) {
+        alert(`File size exceeds ${MAX_FILE_SIZE / (1024 * 1024)}MB limit.`);
+        return;
+    }
+
+    let processedFile = file;
+    let type = file.type.split('/')[0];
+
+    try {
+        if (type === 'image') {
+            processedFile = await compressImage(file);
+        } else if (type === 'video') {
+            if (file.size > MAX_VIDEO_SIZE) {
+                processedFile = await compressVideo(file);
+            }
+        }
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const messageData = {
+                sender: userId,
+                receiver: friendId,
+                content: e.target.result,
+                type: file.type.startsWith('video/') ? 'video' : type, // Ensure video type is set correctly
+                fileName: processedFile.name,
+                fileType: processedFile.type,
+                id: generateUniqueId()
+            };
+            socket.emit('sendMessage', messageData);
+        };
+        reader.readAsDataURL(processedFile);
+    } catch (error) {
+        console.error('Error processing file:', error);
+        alert('Error processing file. Please try again.');
+    }
+}
+
+function compressImage(file) {
+    return new Promise((resolve, reject) => {
+        new Compressor(file, {
+            quality: 0.6,
+            maxWidth: MAX_IMAGE_SIZE,
+            maxHeight: MAX_IMAGE_SIZE,
+            success(result) {
+                resolve(result);
+            },
+            error(err) {
+                reject(err);
+            },
+        });
+    });
+}
+
+async function compressVideo(file) {
+    const { createFFmpeg, fetchFile } = FFmpeg;
+    const ffmpeg = createFFmpeg({ log: true });
+    await ffmpeg.load();
+
+    ffmpeg.FS('writeFile', file.name, await fetchFile(file));
+    await ffmpeg.run('-i', file.name, '-b:v', '1M', '-b:a', '128k', 'output.mp4');
+    const data = ffmpeg.FS('readFile', 'output.mp4');
+
+    return new File([data.buffer], 'compressed_' + file.name, { type: 'video/mp4' });
+}
+
+function renderMessage(message) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${message.sender === userId ? 'sent' : 'received'}`;
+            
+            switch(message.type) {
+                case 'image':
+                    messageDiv.innerHTML = `
+                        <img src="${message.content}" alt="Sent image" class="max-w-xs max-h-xs rounded-lg cursor-pointer" onclick="showMediaOverlay('${message.content}', 'image')">
+                        <div class="message-time">${formatTime(message.timestamp)}</div>
+                    `;
+                    break;
+                case 'video':
+                    messageDiv.innerHTML = `
+                          <video controls muted class="max-w-xs max-h-xs rounded-xl cursor-pointer" onclick="showMediaOverlay('${message.content}', 'video')">
+                            <source src="${message.content}" >
+                            Your browser does not support the video tag.
+                        </video>
+                        <div class="message-time">${formatTime(message.timestamp)}</div>
+                    `;
+                    break;
+                case 'file':
+                    const fileIcon = getFileIcon(message.fileName);
+                    messageDiv.innerHTML = `
+                        <div class="file-message">
+                            ${fileIcon}
+                            <a href="${message.content}" download="${message.fileName}">${message.fileName}</a>
+                        </div>
+                        <div class="message-time">${formatTime(message.timestamp)}</div>
+                    `;
+                    break;
+                default:
                     messageDiv.innerHTML = `
                         ${message.content}
                         <div class="message-time">${formatTime(message.timestamp)}</div>
                     `;
-                    chatMessages.appendChild(messageDiv);
-                });
+            }
+            
+            return messageDiv;
+        }
+
+        function showMediaOverlay(src, type) {
+            const overlay = document.createElement('div');
+            overlay.className = 'fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50';
+            
+            const media = type === 'image' 
+                ? `<img src="${src}" alt="Full size image" class="max-w-full max-h-full object-contain">`
+                : `<video src="${src}" controls autoplay class="max-w-full max-h-full object-contain"></video>`;
+            
+            overlay.innerHTML = `
+                ${media}
+                <button onclick="this.parentElement.remove()" class="absolute top-4 right-4 text-white text-4xl">&times;</button>
+            `;
+            
+            document.body.appendChild(overlay);
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            else if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+            else if (bytes < 1073741824) return (bytes / 1048576).toFixed(1) + ' MB';
+            else return (bytes / 1073741824).toFixed(1) + ' GB';
+        }
+
+
+        function getFileIcon(fileName) {
+            const extension = fileName.split('.').pop().toLowerCase();
+            switch(extension) {
+                case 'pdf': return '<i class="fas fa-file-pdf"></i>';
+                case 'doc':
+                case 'docx': return '<i class="fas fa-file-word"></i>';
+                case 'xls':
+                case 'xlsx': return '<i class="fas fa-file-excel"></i>';
+                case 'zip':
+                case 'rar': return '<i class="fas fa-file-archive"></i>';
+                case 'mp3':
+                case 'wav': return '<i class="fas fa-file-audio"></i>';
+                case 'mp4':
+                case 'avi':
+                case 'mov': return '<i class="fas fa-file-video"></i>';
+                default: return '<i class="fas fa-file"></i>';
+            }
+        }
+
+    socket.on('loadMessages', messages => {
+        const chatMessages = document.getElementById('chat-messages');
+        chatMessages.innerHTML = '';
+        const groupedMessages = groupMessagesByDate(messages);
+        groupedMessages.forEach(group => {
+            const dateDiv = document.createElement('div');
+            dateDiv.className = 'message-date';
+            dateDiv.textContent = formatDate(group.date);
+            chatMessages.appendChild(dateDiv);
+            group.messages.forEach(message => {
+                chatMessages.appendChild(renderMessage(message));
             });
-            chatMessages.scrollTop = chatMessages.scrollHeight;
         });
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+    });
+
+  
+    let typingTimeout;
+
+function handleTyping() {
+    clearTimeout(typingTimeout);
+    socket.emit('userTyping', { userId, typing: true });
+    
+    typingTimeout = setTimeout(() => {
+        socket.emit('userTyping', { userId, typing: false });
+    }, 1000);
+}
+
+socket.on('typing', data => {
+    if (data.userId === friendId) {
+        const statusElement = document.getElementById('status');
+        if (data.typing) {
+            statusElement.innerText = 'Typing...';
+        } else {
+            statusElement.innerText = 'Online';
+        }
+    }
+});
+
+document.getElementById('message-input').addEventListener('input', handleTyping);
 
         function groupMessagesByDate(messages) {
             const groups = {};
@@ -239,6 +439,7 @@
                     sender: userId,
                     receiver: friendId,
                     content: message,
+                    type: 'text',  
                     id: generateUniqueId()
                 };
                 socket.emit('sendMessage', messageData);
@@ -247,16 +448,42 @@
         }
 
         socket.on('receiveMessage', message => {
-            const chatMessages = document.getElementById('chat-messages');
-            const messageDiv = document.createElement('div');
-            messageDiv.className = `message ${message.sender === userId ? 'sent' : 'received'}`;
+    const chatMessages = document.getElementById('chat-messages');
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `message ${message.sender === userId ? 'sent' : 'received'}`;
+    
+    switch (message.type) {
+        case 'image':
+            messageDiv.innerHTML = `
+                 <img src="${message.content}" alt="Sent image" class="max-w-xs max-h-xs rounded-lg cursor-pointer" onclick="showMediaOverlay('${message.content}', 'image')">
+                <div class="message-time">${formatTime(new Date())}</div>
+            `;
+            break;
+        case 'video':
+            messageDiv.innerHTML = `
+                <video controls muted class="max-w-xs max-h-xs rounded-lg cursor-pointer" onclick="showMediaOverlay('${message.content}', 'video')">
+                    <source src="${message.content}">
+                    Your browser does not support the video tag.
+                </video>
+                <div class="message-time">${formatTime(new Date())}</div>
+            `;
+            break;
+        case 'file':
+            messageDiv.innerHTML = `
+                <a href="${message.content}" download="${message.fileName}">${message.fileName}</a>
+                <div class="message-time">${formatTime(new Date())}</div>
+            `;
+            break;
+        default:
             messageDiv.innerHTML = `
                 ${message.content}
                 <div class="message-time">${formatTime(new Date())}</div>
             `;
-            chatMessages.appendChild(messageDiv);
-            chatMessages.scrollTop = chatMessages.scrollHeight;
-        });
+    }
+    
+    chatMessages.appendChild(messageDiv);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+});
 
         socket.on('messageRead', data => {
             const { userId, messageId } = data;
