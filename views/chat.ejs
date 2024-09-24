@@ -189,13 +189,18 @@
 
         const userId = '<%= user._id %>';
         const friendId = '<%= friend._id %>';
+        const roomName = [userId, friendId].sort().join('-');
+
+socket.emit('joinRoom', { userId, roomName });
+
+socket.emit('fetchMessages', {
+    sender: userId,
+    receiver: friendId,
+    roomName: roomName
+});
 
         socket.emit('userConnected', userId);
-
-        socket.emit('fetchMessages', {
-            sender: userId,
-            receiver: friendId
-        });
+        
 
         document.getElementById('attach-btn').addEventListener('click', () => {
         document.getElementById('file-input').click();
@@ -361,31 +366,31 @@ function renderMessage(message) {
             }
         }
 
-    socket.on('loadMessages', messages => {
-        const chatMessages = document.getElementById('chat-messages');
-        chatMessages.innerHTML = '';
-        const groupedMessages = groupMessagesByDate(messages);
-        groupedMessages.forEach(group => {
-            const dateDiv = document.createElement('div');
-            dateDiv.className = 'message-date';
-            dateDiv.textContent = formatDate(group.date);
-            chatMessages.appendChild(dateDiv);
-            group.messages.forEach(message => {
-                chatMessages.appendChild(renderMessage(message));
+        socket.on('loadMessages', messages => {
+            const chatMessages = document.getElementById('chat-messages');
+            chatMessages.innerHTML = '';
+            const groupedMessages = groupMessagesByDate(messages);
+            groupedMessages.forEach(group => {
+                const dateDiv = document.createElement('div');
+                dateDiv.className = 'message-date';
+                dateDiv.textContent = formatDate(group.date);
+                chatMessages.appendChild(dateDiv);
+                group.messages.forEach(message => {
+                    chatMessages.appendChild(renderMessage(message));
+                });
             });
+            chatMessages.scrollTop = chatMessages.scrollHeight;
         });
-        chatMessages.scrollTop = chatMessages.scrollHeight;
-    });
 
   
-    let typingTimeout;
+        let typingTimeout;
 
 function handleTyping() {
     clearTimeout(typingTimeout);
-    socket.emit('userTyping', { userId, typing: true });
+    socket.emit('userTyping', { userId, roomName, typing: true });
     
     typingTimeout = setTimeout(() => {
-        socket.emit('userTyping', { userId, typing: false });
+        socket.emit('userTyping', { userId, roomName, typing: false });
     }, 1000);
 }
 
@@ -430,6 +435,7 @@ document.getElementById('message-input').addEventListener('input', handleTyping)
             }
         });
 
+        
         function sendMessage() {
             const messageInput = document.getElementById('message-input');
             const message = messageInput.value.trim();
@@ -440,49 +446,58 @@ document.getElementById('message-input').addEventListener('input', handleTyping)
                     receiver: friendId,
                     content: message,
                     type: 'text',  
-                    id: generateUniqueId()
+                    id: generateUniqueId(),
+                    timestamp: new Date().toISOString(),
+                    roomName: roomName
                 };
                 socket.emit('sendMessage', messageData);
+                renderMessage(messageData); // Immediately render the sent message
                 messageInput.value = '';
             }
         }
 
         socket.on('receiveMessage', message => {
-    const chatMessages = document.getElementById('chat-messages');
-    const messageDiv = document.createElement('div');
-    messageDiv.className = `message ${message.sender === userId ? 'sent' : 'received'}`;
-    
-    switch (message.type) {
-        case 'image':
-            messageDiv.innerHTML = `
-                 <img src="${message.content}" alt="Sent image" class="max-w-xs max-h-xs rounded-lg cursor-pointer" onclick="showMediaOverlay('${message.content}', 'image')">
-                <div class="message-time">${formatTime(new Date())}</div>
-            `;
-            break;
-        case 'video':
-            messageDiv.innerHTML = `
-                <video controls muted class="max-w-xs max-h-xs rounded-lg cursor-pointer" onclick="showMediaOverlay('${message.content}', 'video')">
-                    <source src="${message.content}">
-                    Your browser does not support the video tag.
-                </video>
-                <div class="message-time">${formatTime(new Date())}</div>
-            `;
-            break;
-        case 'file':
-            messageDiv.innerHTML = `
-                <a href="${message.content}" download="${message.fileName}">${message.fileName}</a>
-                <div class="message-time">${formatTime(new Date())}</div>
-            `;
-            break;
-        default:
-            messageDiv.innerHTML = `
-                ${message.content}
-                <div class="message-time">${formatTime(new Date())}</div>
-            `;
+    if (message.roomName === roomName) {
+        const chatMessages = document.getElementById('chat-messages');
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `message ${message.sender === userId ? 'sent' : 'received'}`;
+        
+        switch(message.type) {
+            case 'image':
+                messageDiv.innerHTML = `
+                    <img src="${message.content}" alt="Sent image" class="max-w-xs max-h-xs rounded-lg cursor-pointer" onclick="showMediaOverlay('${message.content}', 'image')">
+                    <div class="message-time">${formatTime(message.timestamp)}</div>
+                `;
+                break;
+            case 'video':
+                messageDiv.innerHTML = `
+                    <video controls muted class="max-w-xs max-h-xs rounded-xl cursor-pointer" onclick="showMediaOverlay('${message.content}', 'video')">
+                        <source src="${message.content}">
+                        Your browser does not support the video tag.
+                    </video>
+                    <div class="message-time">${formatTime(message.timestamp)}</div>
+                `;
+                break;
+            case 'file':
+                const fileIcon = getFileIcon(message.fileName);
+                messageDiv.innerHTML = `
+                    <div class="file-message">
+                        ${fileIcon}
+                        <a href="${message.content}" download="${message.fileName}">${message.fileName}</a>
+                    </div>
+                    <div class="message-time">${formatTime(message.timestamp)}</div>
+                `;
+                break;
+            default: // text message
+                messageDiv.innerHTML = `
+                    ${message.content}
+                    <div class="message-time">${formatTime(message.timestamp)}</div>
+                `;
+        }
+        
+        chatMessages.appendChild(messageDiv);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
     }
-    
-    chatMessages.appendChild(messageDiv);
-    chatMessages.scrollTop = chatMessages.scrollHeight;
 });
 
         socket.on('messageRead', data => {
