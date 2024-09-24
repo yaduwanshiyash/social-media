@@ -28,6 +28,21 @@
       <% }); %>
     </div>
 
+    <div id="skeleton-loader" class="hidden space-y-4">
+      <% for (let i = 0; i < 4; i++) { %>
+        <div class="skeleton-item animate-pulse bg-gray-200 dark:bg-zinc-700 rounded-lg overflow-hidden">
+          <div class="flex items-center p-4">
+            <div class="w-16 h-16 rounded-full bg-gray-300 dark:bg-zinc-600 mr-4 flex-shrink-0"></div>
+            <div class="flex-grow">
+              <div class="h-5 bg-gray-300 dark:bg-zinc-600 rounded w-3/4 mb-2"></div>
+              <div class="h-4 bg-gray-300 dark:bg-zinc-600 rounded w-1/2 mb-1"></div>
+              <div class="h-4 bg-gray-300 dark:bg-zinc-600 rounded w-2/3"></div>
+            </div>
+          </div>
+        </div>
+      <% } %>
+    </div>
+
     <div id="no-results" class="hidden text-center text-zinc-500 dark:text-zinc-400 mt-8 text-lg">
       No users found. Try a different search term.
     </div>
@@ -38,6 +53,7 @@
   const inp = document.querySelector("#inputusername");
   const userItems = document.querySelectorAll('.user-item');
   const noResults = document.querySelector("#no-results");
+  const skeletonLoader = document.querySelector("#skeleton-loader");
   let debounceTimer;
   
   inp.addEventListener("input", function() {
@@ -45,23 +61,31 @@
     clearTimeout(debounceTimer);
     
     if (typed.length > 0) {
+      // Show skeleton loader
+      skeletonLoader.classList.remove('hidden');
+      userItems.forEach(item => item.classList.add('hidden'));
+      noResults.classList.add('hidden');
+      
       debounceTimer = setTimeout(() => {
         let matchFound = false;
         userItems.forEach(item => {
           const username = item.querySelector('h3').textContent.toLowerCase();
           if (username.includes(typed)) {
-            item.style.display = 'block';
+            item.classList.remove('hidden');
             matchFound = true;
           } else {
-            item.style.display = 'none';
+            item.classList.add('hidden');
           }
         });
         
+        // Hide skeleton loader and show results
+        skeletonLoader.classList.add('hidden');
         noResults.classList.toggle('hidden', matchFound);
-      }, 300);
+      }, 500); // Increased delay to 500ms to make the skeleton loader more noticeable
     } else {
-      userItems.forEach(item => item.style.display = 'block');
+      userItems.forEach(item => item.classList.remove('hidden'));
       noResults.classList.add('hidden');
+      skeletonLoader.classList.add('hidden');
     }
   });
 </script>

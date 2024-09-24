@@ -1,4 +1,5 @@
 <% include ./partials/header.ejs %>
+
 <div class="w-full h-screen bg-zinc-900 overflow-hidden">
   <div class="w-full h-full relative">
     <div class="reels-container w-full h-full overflow-y-scroll snap-y snap-mandatory">
@@ -33,6 +34,7 @@
         </div>
       <% }) %>
     </div>
+    <div id="loading" class="w-full text-center text-white py-4">Loading...</div>
   </div>
 </div>
 
@@ -43,6 +45,12 @@
   integrity="sha512-7eHRwcbYkK4d9g/6tD/mhkf++eoTHwpNM9woBxtPUBWm67zeAfFC+HrdoE2GanKeocly/VxeLvIqwvCdk7qScg=="
   crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script>
+  let page = 1;
+  let loading = false;
+  let noMoreReels = false;
+  let initialReels = [];
+  const user = <%- JSON.stringify(user) %>; // Pass the user variable to the client-side script
+
   function handleLike() {
     document.querySelector(".reels-container").addEventListener("click", function (ev) {
       if (ev.target.closest('.like')) {
@@ -113,26 +121,23 @@
   }
 
   function handleVideoPlayback() {
-    const videos = document.querySelectorAll('.reel-slide video');
-    const observer = new IntersectionObserver((entries) => {
-      entries.forEach(entry => {
-        if (entry.isIntersecting) {
-          entry.target.play();
-        } else {
-          entry.target.pause();
-        }
+    document.querySelectorAll('video').forEach(video => {
+      video.addEventListener('play', function () {
+        document.querySelectorAll('video').forEach(v => {
+          if (v !== video) v.pause();
+        });
       });
-    }, { threshold: 0.5 });
-
-    videos.forEach(video => observer.observe(video));
+    });
   }
 
   function handleVideoMute() {
-    document.querySelectorAll(".mute-button").forEach(button => {
-      button.addEventListener("click", function (ev) {
-        const video = ev.target.closest('.video-container').querySelector('video');
+    document.querySelectorAll('.mute-button').forEach(button => {
+      button.addEventListener('click', function () {
+        const video = button.closest('.video-container').querySelector('video');
+        const icon = button.querySelector('i');
+        
         video.muted = !video.muted;
-        const icon = ev.target.closest('.mute-button').querySelector('i');
+        
         if (video.muted) {
           icon.classList.remove('ri-volume-up-fill');
           icon.classList.add('ri-volume-mute-fill');
@@ -163,6 +168,96 @@
       }
     });
   }
+
+  function fetchMoreReels() {
+    if (loading) return;
+    loading = true;
+    document.getElementById('loading').style.display = 'block';
+    console.log('Fetching more reels...');
+
+    const endpoint = noMoreReels ? '/random-reels' : `/reels?page=${page}`;
+
+    axios.get(endpoint)
+      .then(function (response) {
+        console.log('Reels fetched:', response.data.reels);
+        const reelsContainer = document.querySelector('.reels-container');
+
+        if (response.data.reels.length === 0) {
+          noMoreReels = true;
+          fetchMoreReels();
+          return;
+        }
+
+        response.data.reels.forEach(function (elem) {
+          const reelSlide = document.createElement('div');
+          reelSlide.classList.add('reel-slide', 'w-full', 'h-screen', 'snap-start', 'relative', 'flex', 'justify-center', 'items-center');
+          reelSlide.innerHTML = `
+            <div class="video-container w-full max-w-md h-full relative">
+              <video data-id="${elem._id}" class="w-full h-full object-cover" src="${elem.source}" loop></video>
+              <button class="mute-button absolute top-4 right-4 text-white text-2xl z-10">
+                <i class="ri-volume-up-fill"></i>
+              </button>
+              <div class="absolute top-0 left-0 w-full h-full bg-gradient-to-b from-transparent to-black opacity-50"></div>
+              <div class="absolute bottom-0 left-0 w-full p-6">
+                <div class="flex items-center gap-4 mb-4">
+                  <div class="w-12 h-12 rounded-full overflow-hidden border-2 border-white">
+                    <img class="w-full h-full object-cover" src="${elem.user.profileImage}" loading="lazy" alt="${elem.user.username}'s profile">
+                  </div>
+                  <a href="/userprofile/${elem.user.username}" class="text-white text-lg font-semibold">${elem.user.username}</a>
+                </div>
+                <p class="text-white text-sm mb-4">${elem.caption}</p>
+                <div class="flex justify-between items-center">
+                  <div class="flex gap-6">
+                    <button class="like text-white text-2xl" data-id="${elem._id}">
+                      <i class="${elem.likes.indexOf(user._id) === -1 ? 'ri-heart-3-line' : 'text-red-500 ri-heart-3-fill'}"></i>
+                    </button>
+                    <a href="/comment/reel/${elem._id}" class="text-white text-2xl"><i class="ri-chat-3-line"></i></a>
+                    <button class="text-white text-2xl"><i class="ri-share-circle-line"></i></button>
+                  </div>
+                  <a href="/liked/reel/${elem._id}" class="text-white text-sm font-semibold">${elem.likes.length} likes</a>
+                </div>
+              </div>
+            </div>
+          `;
+          reelsContainer.appendChild(reelSlide);
+        });
+
+        page++;
+        loading = false;
+        document.getElementById('loading').style.display = 'none';
+        handleVideoPlayback();
+        handleVideoMute();
+      })
+      .catch(function (error) {
+        console.error('Error fetching more reels:', error);
+        loading = false;
+        document.getElementById('loading').style.display = 'none';
+      });
+  }
+
+  function cloneInitialReels() {
+    const reelsContainer = document.querySelector('.reels-container');
+    initialReels.forEach(reel => {
+      const clone = reel.cloneNode(true);
+      reelsContainer.appendChild(clone);
+    });
+  }
+
+  document.querySelector('.reels-container').addEventListener('scroll', function () {
+    const container = document.querySelector('.reels-container');
+    console.log('Scroll event:', container.scrollTop + container.clientHeight, container.scrollHeight);
+    if (container.scrollTop + container.clientHeight >= container.scrollHeight - 100) {
+      if (noMoreReels) {
+        cloneInitialReels();
+      } else {
+        fetchMoreReels();
+      }
+    }
+  });
+
+  document.addEventListener('DOMContentLoaded', function () {
+    initialReels = Array.from(document.querySelectorAll('.reel-slide'));
+  });
 
   handleLike();
   makeHeartAnimation();

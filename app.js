@@ -47,8 +47,15 @@ if (!fs.existsSync(uploadDir)){
 io.on('connection', (socket) => {
     console.log('A user connected');
 
+    socket.on('joinRoom', ({ userId, roomName }) => {
+        socket.join(roomName);
+        onlineUsers[userId] = socket.id;
+        console.log(`User ${userId} joined room ${roomName}`);
+        io.to(roomName).emit('userOnline', { userId });
+    });
     // When a user comes online
     socket.on('userConnected', (userId) => {
+        socket.join(userId);  // This allows targeting messages to specific users
         onlineUsers[userId] = socket.id; // Track the user's socket ID
         io.emit('userOnline', { userId }); // Notify all clients that the user is online
         console.log(`${userId} is online`);
@@ -57,13 +64,8 @@ io.on('connection', (socket) => {
  
 
 
-    // Handle typing status
-    socket.on('userTyping', data => {
-        const { userId, typing } = data;
-        if (users[userId]) {
-            users[userId].typing = typing;
-            io.emit('typing', { userId, typing });
-        }
+    socket.on('userTyping', ({ userId, roomName, typing }) => {
+        socket.to(roomName).emit('typing', { userId, typing });
     });
 
     socket.on('markAsRead', data => {
@@ -78,55 +80,50 @@ io.on('connection', (socket) => {
     });
 
     // Handle sending new messages
-    socket.on('sendMessage', async (message) => {
-        if (message.type === 'image' || message.type === 'video' || message.type === 'file') {
-            // Extract the base64 data
-            const base64Data = message.content.split(';base64,').pop();
-            
-            // Determine file extension
-            const fileExtension = mime.extension(message.fileType);
+    socket.on('sendMessage', async (messageData) => {
+        
+        if (messageData.type === 'image' || messageData.type === 'video' || messageData.type === 'file') {
+            const base64Data = messageData.content.split(';base64,').pop();
+            const fileExtension = mime.extension(messageData.fileType);
             const fileName = `${Date.now()}.${fileExtension}`;
 
-            // Upload to ImageKit
             imagekit.upload({
                 file: base64Data,
                 fileName: fileName,
                 folder: "/chat_uploads/",
                 useUniqueFileName: true,
-                tags: [message.type]
+                tags: [messageData.type]
             }, async function(error, result) {
                 if(error) {
                     console.error('Error uploading to ImageKit:', error);
                     return;
                 }
 
+                messageData.content = result.url;
+                messageData.fileName = result.name;
                 
-                // Update message content to ImageKit URL
-                message.content = result.url;
-                message.fileName = result.name;
-                
-                const newMessage = new Message(message);
+                const newMessage = new Message(messageData);
                 await newMessage.save();
-                io.emit('receiveMessage', message); // Emit to all clients
+                
+                io.to(messageData.roomName).emit('receiveMessage', messageData);
             });
         } else {
-            // Text message
-            const newMessage = new Message(message);
+            const newMessage = new Message(messageData);
             await newMessage.save();
-            io.emit('receiveMessage', message); // Emit to all clients
+            io.to(messageData.roomName).emit('receiveMessage', messageData);
         }
     });
 
     // Handle fetching chat messages between two users
-    socket.on('fetchMessages', async ({ sender, receiver }) => {
+    socket.on('fetchMessages', async ({ sender, receiver, roomName }) => {
         const messages = await Message.find({
             $or: [
                 { sender, receiver },
                 { sender: receiver, receiver: sender }
             ]
-        }).sort({ timestamp: 1 }); // Sort messages by timestamp
+        }).sort({ timestamp: 1 });
 
-        socket.emit('loadMessages', messages); // Load messages for the specific user
+        socket.emit('loadMessages', messages);
     });
 
     // Handle video call request from a user
@@ -162,10 +159,10 @@ io.on('connection', (socket) => {
 
     // Handle user disconnection
     socket.on('disconnect', () => {
-        const userId = Object.keys(onlineUsers).find((key) => onlineUsers[key] === socket.id);
+        const userId = Object.keys(onlineUsers).find(key => onlineUsers[key] === socket.id);
         if (userId) {
-            delete onlineUsers[userId]; // Remove the user from the online list
-            io.emit('userOffline', { userId }); // Notify all clients that the user is offline
+            delete onlineUsers[userId];
+            io.emit('userOffline', { userId });
             console.log(`${userId} is offline`);
         }
     });
@@ -183,7 +180,7 @@ app.use(
         rolling: true,
   cookie: { 
     secure: false,
-    maxAge: new Date(Date.now() + 2 * 60 * 60 * 1000)
+    maxAge: 2 * 60 * 60 * 1000 // 2 hours in milliseconds
   }
     })
 );

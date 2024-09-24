@@ -90,7 +90,6 @@ router.get('/chat', isloggedin, async function(req, res) {
   }
 });
 
-// GET chat history with a specific friend
 
 
 
@@ -160,6 +159,56 @@ router.get('/reel', isloggedin, async (req, res) => {
   } catch (error) {
     console.error('Error occurred while fetching reels:', error);
     res.status(500).send('Internal Server Error');
+  }
+});
+
+
+router.get('/reels', isloggedin, async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = 10; // Number of reels per page
+    const startIndex = (page - 1) * limit;
+    const endIndex = page * limit;
+
+    const reels = await videoModel.find().populate('user').skip(startIndex).limit(limit).lean();
+
+    res.json({
+      reels,
+      page,
+      totalPages: Math.ceil(await videoModel.countDocuments() / limit)
+    });
+  } catch (error) {
+    console.error('Error occurred while fetching reels:', error);
+    res.status(500).send('Internal Server Error');
+  }
+});
+
+// Route to handle /random-reels
+router.get('/random-reels', isloggedin, async (req, res) => {
+  try {
+    const randomReels = await videoModel.aggregate([{ $sample: { size: 10 } }]).populate('user').exec();
+    res.json({ reels: randomReels });
+  } catch (error) {
+    console.error('Error occurred while fetching random reels:', error);
+    res.status(500).send('Internal Server Error');
+  }
+});
+
+router.get('/api/posts', async (req, res) => {
+  try {
+      const posts = await postModel.find({ user: req.user._id }).sort({ date: -1 });
+      res.json(posts);
+  } catch (error) {
+      res.status(500).json({ message: 'Error fetching posts' });
+  }
+});
+
+router.get('/api/videos', async (req, res) => {
+  try {
+      const videos = await videoModel.find({ user: req.user._id }).sort({ date: -1 });
+      res.json(videos);
+  } catch (error) {
+      res.status(500).json({ message: 'Error fetching videos' });
   }
 });
 
@@ -704,20 +753,6 @@ router.get('/logout', function(req, res, next){
   });
 });
 
-// router.post("/update",upload.single('image'), async function(req,res,next){
-//   const user = await userModel.findOneAndUpdate({username: req.session.passport.user},{username: req.body.username,name: req.body.name,bio: req.body.bio},{new: true})
-//   if(req.file){
-//     const result = await cloudinary.uploader.upload(req.file.path);
-//     user.profileImage = result.secure_url
-//   }
-//   await user.save();
-
-//   req.logIn(user,function(err){
-//     if(err) throw err;
-//     res.redirect("/profile")
-//   })
-
-// })
 
 
 router.post("/update", upload.single('image'), async function(req, res, next) {
@@ -818,7 +853,7 @@ router.post("/upload", isloggedin, upload.single("image"), async function (req, 
           user: user._id
         });
         console.log("New story created:", story);
-        user.stories.push(story._id);
+        user.story.push(story._id);
       }
 
       // Remove the compressed file after upload
@@ -887,94 +922,6 @@ router.post("/upload", isloggedin, upload.single("image"), async function (req, 
 });
 
 
-// router.post("/upload", isloggedin, upload.single("image"), async function(req, res) {
-//   try {
-//     const user = await userModel.findOne({ username: req.session.passport.user });
-
-//     if (!user) {
-//       return res.status(404).json({ error: "User not found" });
-//     }
-
-//     if (!req.file) {
-//       return res.status(400).json({ error: "No image or video uploaded" });
-//     }
-
-//     const fileType = req.file.mimetype;
-//     const validImageTypes = ["image/jpeg", "image/png", "image/gif"];
-//     const validVideoTypes = ["video/mp4", "video/mpeg", "video/ogg"];
-
-//     if (!["post", "story", "reel"].includes(req.body.type)) {
-//       return res.status(400).json({ error: "Invalid type" });
-//     }
-
-//     if (req.body.type === "post" || req.body.type === "story") {
-//       if (!validImageTypes.includes(fileType)) {
-//         return res.status(400).json({ error: "Invalid file type for post or story. Only images are allowed." });
-//       }
-
-//       const result = await cloudinary.uploader.upload(req.file.path);
-
-//       if (req.body.type === "post") {
-//         const post = await postModel.create({
-//           picture: result.secure_url,
-//           user: user._id,
-//           caption: req.body.caption
-//         });
-//         console.log("New post created:", post);
-//         user.posts.push(post._id);
-//       } else if (req.body.type === "story") {
-//         const story = await storyModel.create({
-//           picture: result.secure_url,
-//           user: user._id
-//         });
-//         console.log("New story created:", story);
-//         user.stories.push(story._id);
-//       }
-//     } else if (req.body.type === "reel") {
-//       if (!validVideoTypes.includes(fileType)) {
-//         return res.status(400).json({ error: "Invalid file type for reel. Only videos are allowed." });
-//       }
-
-//       const videoPath = req.file.path;
-//       const video = await fs.promises.readFile(videoPath);
-
-//       const result = await new Promise((resolve, reject) => {
-//         imagekit.upload(
-//           {
-//             file: video,
-//             fileName: req.file.filename,
-//             folder: 'videos',
-//           },
-//           (error, result) => {
-//             if (error) {
-//               reject(new Error('Failed to upload video to ImageKit'));
-//             } else {
-//               resolve(result);
-//             }
-//           }
-//         );
-//       });
-
-//       const newVideo = new videoModel({
-//         caption: req.body.caption,
-//         source: result.url,
-//         user: user._id
-//       });
-
-//       await newVideo.save();
-//       user.videos.push(newVideo._id);
-//       console.log("New reel created:", newVideo);
-
-//       await fs.promises.unlink(videoPath);
-//     }
-
-//     await user.save();
-//     res.redirect("/feed");
-//   } catch (error) {
-//     console.error("Error occurred:", error);
-//     res.status(500).json({ error: "Internal Server Error" });
-//   }
-// });
 
 
 
@@ -1143,6 +1090,87 @@ router.get("/delete/post/:id", isloggedin, async function(req, res) {
   } catch (err) {
     console.error(err);
     res.status(500).send("Internal Server Error");
+  }
+});
+
+router.delete("/post/:id", isloggedin, async function(req, res) {
+  try {
+    const user = await userModel.findOne({ username: req.session.passport.user });
+    const post = await postModel.findOne({ _id: req.params.id });
+
+    if (!user || !post) {
+      return res.status(404).json({ message: "User or post not found" });
+    }
+
+    if (post.user.toString() !== user._id.toString()) {
+      return res.status(403).json({ message: "You don't have permission to delete this post" });
+    }
+
+    // Remove post reference from user's posts array
+    user.posts = user.posts.filter(postId => postId.toString() !== post._id.toString());
+    await user.save();
+
+    // Delete associated image from the 'uploads' directory
+    if (post.picture) {
+      const uploadPath = path.resolve(__dirname, '../public/images/uploads');
+      const imagePath = path.join(uploadPath, post.picture);
+
+      try {
+        await fs.unlink(imagePath);
+        console.log(`Successfully deleted image: ${post.picture}`);
+      } catch (error) {
+        console.error(`Error deleting image: ${post.picture}`, error);
+      }
+    }
+
+    // Remove post document
+    await postModel.deleteOne({ _id: req.params.id });
+
+    res.json({ message: "Post deleted successfully" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+});
+
+// Delete Video
+router.delete("/video/:id", isloggedin, async function(req, res) {
+  try {
+    const user = await userModel.findOne({ username: req.session.passport.user });
+    const video = await videoModel.findOne({ _id: req.params.id });
+
+    if (!user || !video) {
+      return res.status(404).json({ message: "User or video not found" });
+    }
+
+    if (video.user.toString() !== user._id.toString()) {
+      return res.status(403).json({ message: "You don't have permission to delete this video" });
+    }
+
+    // Remove video reference from user's videos array
+    user.videos = user.videos.filter(videoId => videoId.toString() !== video._id.toString());
+    await user.save();
+
+    // Delete associated video file from the 'uploads' directory
+    if (video.source) {
+      const uploadPath = path.resolve(__dirname, '../public/videos/uploads');
+      const videoPath = path.join(uploadPath, video.source);
+
+      try {
+        await fs.unlink(videoPath);
+        console.log(`Successfully deleted video: ${video.source}`);
+      } catch (error) {
+        console.error(`Error deleting video: ${video.source}`, error);
+      }
+    }
+
+    // Remove video document
+    await videoModel.deleteOne({ _id: req.params.id });
+
+    res.json({ message: "Video deleted successfully" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Internal Server Error" });
   }
 });
 
