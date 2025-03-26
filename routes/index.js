@@ -127,6 +127,41 @@ router.get('/chat/:friendId', isloggedin, async (req, res) => {
 
 
 // Example route: /reel
+// router.get('/reel', isloggedin, async (req, res) => {
+//   try {
+//     // Get the logged-in user
+//     const user = await userModel.findOne({ username: req.session.passport.user });
+//     if (!user) {
+//       return res.status(404).send('User not found');
+//     }
+
+//     // Cache key to store and retrieve data
+//     const cacheKey = `reels:${user._id}`;
+
+//     // Try to get data from Redis
+//     const cachedReels = await redisClient.get(cacheKey);
+
+//     if (cachedReels) {
+//       // If cached data is found, parse it and send it to the client
+//       console.log('Cache hit');
+//       const reels = JSON.parse(cachedReels);
+//       return res.render('reel', { footer: true, reels, user });
+//     } else {
+//       // If no cache, fetch from MongoDB
+//       const reels = await videoModel.find().populate('user').lean();
+
+//       // Store fetched data in Redis for 60 seconds
+//       await redisClient.setEx(cacheKey, 600, JSON.stringify(reels));
+
+//       // Send the response to the client
+//       res.render('reel', { footer: true, reels, user });
+//     }
+//   } catch (error) {
+//     console.error('Error occurred while fetching reels:', error);
+//     res.status(500).send('Internal Server Error');
+//   }
+// });
+
 router.get('/reel', isloggedin, async (req, res) => {
   try {
     // Get the logged-in user
@@ -135,32 +170,18 @@ router.get('/reel', isloggedin, async (req, res) => {
       return res.status(404).send('User not found');
     }
 
-    // Cache key to store and retrieve data
-    const cacheKey = `reels:${user._id}`;
+    // Fetch reels directly from MongoDB
+    const reels = await videoModel.find().populate('user').lean();
 
-    // Try to get data from Redis
-    const cachedReels = await redisClient.get(cacheKey);
+    // Send the response to the client
+    res.render('reel', { footer: true, reels, user });
 
-    if (cachedReels) {
-      // If cached data is found, parse it and send it to the client
-      console.log('Cache hit');
-      const reels = JSON.parse(cachedReels);
-      return res.render('reel', { footer: true, reels, user });
-    } else {
-      // If no cache, fetch from MongoDB
-      const reels = await videoModel.find().populate('user').lean();
-
-      // Store fetched data in Redis for 60 seconds
-      await redisClient.setEx(cacheKey, 600, JSON.stringify(reels));
-
-      // Send the response to the client
-      res.render('reel', { footer: true, reels, user });
-    }
   } catch (error) {
     console.error('Error occurred while fetching reels:', error);
     res.status(500).send('Internal Server Error');
   }
 });
+
 
 
 router.get('/reels', isloggedin, async (req, res) => {
